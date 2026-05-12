@@ -51,6 +51,9 @@ go through cluster-manager's /api/* surface.`,
 	cmd.AddCommand(
 		newVersionCmd(),
 		newConfigCmd(flags),
+		newConnectionCmd(flags),
+		newClusterCmd(flags),
+		newK8sCmd(flags),
 	)
 	return cmd
 }

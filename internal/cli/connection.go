@@ -95,7 +95,7 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 		username    string
 		password    string
 		color       string
-		note        string
+		description string
 		labels      []string
 	)
 	cmd := &cobra.Command{
@@ -118,7 +118,7 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 				Username:    username,
 				Password:    password,
 				Color:       color,
-				Note:        note,
+				Description: description,
 				Labels:      labelMap,
 				WorkspaceID: global.WorkspaceID,
 			}
@@ -147,7 +147,7 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&username, "user", "", "auth username — optional")
 	cmd.Flags().StringVar(&password, "pass", "", "auth password — optional")
 	cmd.Flags().StringVar(&color, "color", "", "UI accent color in #RRGGBB — optional")
-	cmd.Flags().StringVar(&note, "note", "", "free-form note")
+	cmd.Flags().StringVar(&description, "description", "", "free-form description")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "label as key=value (repeatable)")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("host")
@@ -163,7 +163,7 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 		username    string
 		password    string
 		color       string
-		note        string
+		description string
 		labels      []string
 		workspaceID string
 	)
@@ -198,8 +198,8 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 			if cmd.Flags().Changed("color") {
 				req.Color = &color
 			}
-			if cmd.Flags().Changed("note") {
-				req.Note = &note
+			if cmd.Flags().Changed("description") {
+				req.Description = &description
 			}
 			if cmd.Flags().Changed("workspace-id") {
 				req.WorkspaceID = &workspaceID
@@ -233,7 +233,7 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&username, "user", "", "new username")
 	cmd.Flags().StringVar(&password, "pass", "", "new password")
 	cmd.Flags().StringVar(&color, "color", "", "new accent color")
-	cmd.Flags().StringVar(&note, "note", "", "new note")
+	cmd.Flags().StringVar(&description, "description", "", "new description")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "replace labels — key=value (repeatable)")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "move to a new workspace")
 	return cmd

@@ -20,6 +20,10 @@ var (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	cli.SetBuildInfo(cli.BuildInfo{Version: version, Commit: commit, Date: date})
 
 	// Bind ctrl-c / SIGTERM to a cancelable context so long-running scans and
@@ -30,8 +34,9 @@ func main() {
 	root := cli.NewRootCmd()
 	if err := root.ExecuteContext(ctx); err != nil {
 		printError(err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // printError gives users a single line of actionable context when something

@@ -29,6 +29,7 @@ First public release. Feature-complete coverage of the cluster-manager REST surf
 - `ackoctl` has no `login` flow. Obtain bearer tokens out-of-band (Keycloak CLI, browser device flow, etc.) and inject via `--token`, `ACKOCTL_TOKEN`, or `config set-context --token=...`.
 - `k8s` commands require cluster-manager to be started with `K8S_MANAGEMENT_ENABLED=true`. Without it, every `k8s` request returns HTTP 404.
 - Workspace ACL is explicit: every resource command honors `--workspace`, falling back to the current context's `workspace-id`. There is no silent "first workspace" default.
+- Initial release was validated end-to-end against ACKO + cluster-manager deployed on a kind cluster: config / k8s / connection / cluster / record / set / index / query commands all exercised. Two schema mismatches surfaced and were fixed (`K8sClusterListResponse` envelope, pointer-field rendering).
 
 [Unreleased]: https://github.com/aerospike-ce-ecosystem/ackoctl/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/aerospike-ce-ecosystem/ackoctl/releases/tag/v0.1.0

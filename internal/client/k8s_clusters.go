@@ -7,11 +7,11 @@ import (
 )
 
 func (c *BaseClient) ListK8sClusters(ctx context.Context) ([]K8sCluster, error) {
-	var out []K8sCluster
+	var out K8sClusterListResponse
 	if err := c.Do(ctx, http.MethodGet, "/k8s/clusters", nil, nil, &out); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return out.Items, nil
 }
 
 func (c *BaseClient) GetK8sCluster(ctx context.Context, namespace, name string) (K8sCluster, error) {

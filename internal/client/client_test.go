@@ -139,7 +139,7 @@ func TestK8sListAndReconcile(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/k8s/clusters":
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[{"namespace":"ns","name":"c1","phase":"Completed","size":3}]`))
+			_, _ = w.Write([]byte(`{"items":[{"namespace":"ns","name":"c1","phase":"Completed","size":3}]}`))
 		case "/v1/k8s/clusters/ns/c1/force-reconcile":
 			assert.Equal(t, http.MethodPost, r.Method)
 			w.Header().Set("Content-Type", "application/json")

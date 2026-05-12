@@ -164,6 +164,11 @@ func writeKeyValue(w io.Writer, prefix string, v any) error {
 }
 
 func writeField(w io.Writer, prefix, name string, v any) {
+	v = dereference(v)
+	if v == nil {
+		fmt.Fprintf(w, "%s%s:\n", prefix, name)
+		return
+	}
 	if isComposite(v) {
 		fmt.Fprintf(w, "%s%s:\n", prefix, name)
 		_ = writeKeyValue(w, prefix+"  ", v)
@@ -191,4 +196,21 @@ func isComposite(v any) bool {
 	default:
 		return false
 	}
+}
+
+// dereference returns the underlying value when v is a non-nil pointer; nil
+// for nil pointers; v unchanged otherwise. Without this, table fallback
+// renders pointer fields as raw addresses (e.g. 0x79407532b010).
+func dereference(v any) any {
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return nil
+	}
+	if rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil
+		}
+		return rv.Elem().Interface()
+	}
+	return v
 }

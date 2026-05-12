@@ -78,6 +78,13 @@ type MessageResponse struct {
 type ClusterInfo = map[string]any
 type K8sCluster = map[string]any
 
+// K8sClusterListResponse mirrors cluster-manager's wrapper for
+// GET /k8s/clusters: { "items": [ ... ] }. The CLI flattens it back to
+// a plain slice for callers.
+type K8sClusterListResponse struct {
+	Items []K8sCluster `json:"items"`
+}
+
 // ConfigureNamespaceRequest is a minimal contract — the cluster-manager
 // CreateNamespaceRequest body accepts a namespace name plus dynamic config
 // key/value pairs. We pass it through as a map to avoid drifting against the

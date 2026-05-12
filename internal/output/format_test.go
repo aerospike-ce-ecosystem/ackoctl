@@ -82,6 +82,23 @@ func TestPrintTableFallback(t *testing.T) {
 	assert.NotContains(t, out, "Hidden")
 }
 
+type withPointers struct {
+	Enabled *bool   `yaml:"enabled" json:"enabled"`
+	Count   *int    `yaml:"count" json:"count"`
+	Tag     *string `yaml:"tag" json:"tag"`
+}
+
+func TestPrintTableDereferencesPointers(t *testing.T) {
+	var buf bytes.Buffer
+	yes, n := true, 7
+	require.NoError(t, Print(&buf, FormatTable, withPointers{Enabled: &yes, Count: &n, Tag: nil}))
+	out := buf.String()
+	assert.Regexp(t, `enabled:\s+true`, out)
+	assert.Regexp(t, `count:\s+7`, out)
+	assert.NotContains(t, out, "0x", "pointer should be dereferenced, not printed as an address")
+	assert.Regexp(t, `tag:\s*$`, out)
+}
+
 func TestPrintTableNestedRawMap(t *testing.T) {
 	var buf bytes.Buffer
 	info := map[string]any{

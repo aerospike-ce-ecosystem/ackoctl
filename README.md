@@ -13,11 +13,11 @@ See [docs/usage.md](docs/usage.md) for a per-command cheat sheet and [docs/insta
 ## Install
 
 ```bash
-git clone https://github.com/aerospike-ce-ecosystem/ackoctl.git
-cd ackoctl
-make build
-./bin/ackoctl version
+# macOS and Linux — same one-liner, no Homebrew required
+curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
 ```
+
+Detects OS/arch automatically (darwin/linux × amd64/arm64), verifies the sha256 checksum, and installs to `/usr/local/bin/ackoctl`. See [docs/install.md](docs/install.md) for pinning a version, custom `BIN_DIR`, manual install, and source build.
 
 ## Quick start
 

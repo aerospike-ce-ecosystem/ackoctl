@@ -21,7 +21,7 @@ First public release. Feature-complete coverage of the cluster-manager REST surf
 - **Query** — `query exec` supporting predicate (`--bin/--op/--value[/--value2]`), primary-key lookup, or full scan with `--max-records`. `--value`/`--value2` are JSON-parsed with string fallback.
 - **Indexes** — `index list/create/delete` for `numeric | string | geo2dsphere`. Destructive `delete` requires `--yes`.
 - **Output formatting** — `-o table|json|yaml` everywhere. Polished raw-map table fallback (sorted keys, nested struct/map/slice handling, empty-slice rendering).
-- **Release pipeline** — Makefile, golangci-lint, GitHub Actions (test + lint + cross-build matrix), goreleaser for darwin/linux × amd64/arm64 with optional Homebrew tap PR.
+- **Release pipeline** — Makefile, golangci-lint, GitHub Actions (test + lint + cross-build matrix), goreleaser for darwin/linux × amd64/arm64 with sha256 checksums and an `install.sh` curl one-liner that works identically on macOS and Linux.
 - **Docs** — `docs/usage.md` cheat sheet, `docs/install.md` install methods, README command tree.
 
 ### Notes

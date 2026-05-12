@@ -31,12 +31,19 @@ sh install.sh v0.1.0
 
 ### Install to a custom directory
 
+`BIN_DIR` must be set on the `sh` process — not on `curl`. Use either form:
+
 ```bash
-BIN_DIR="$HOME/.local/bin" \
-  curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh \
+  | BIN_DIR="$HOME/.local/bin" sh
 ```
 
-Make sure `$BIN_DIR` is on your `PATH`. The script warns if it isn't.
+```bash
+export BIN_DIR="$HOME/.local/bin"
+curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
+```
+
+The script warns if `$BIN_DIR` is not on your `PATH`.
 
 ### Inspect before piping (recommended for paranoid environments)
 

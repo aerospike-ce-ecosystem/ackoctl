@@ -158,3 +158,53 @@ type FilteredQueryResponse struct {
 	ReturnedRecords int               `json:"returnedRecords"`
 	TotalEstimated  bool              `json:"totalEstimated"`
 }
+
+// QueryPredicate mirrors cluster-manager's QueryPredicate.
+// Operator: equals | between | contains | geo_within_region | geo_contains_point.
+type QueryPredicate struct {
+	Bin      string `json:"bin"`
+	Operator string `json:"operator"`
+	Value    any    `json:"value"`
+	Value2   any    `json:"value2,omitempty"`
+}
+
+// QueryRequest mirrors cluster-manager's QueryRequest. Either Predicate or
+// PrimaryKey is typically supplied; an empty request triggers a full scan.
+type QueryRequest struct {
+	Namespace  string          `json:"namespace"`
+	Set        string          `json:"set,omitempty"`
+	Predicate  *QueryPredicate `json:"predicate,omitempty"`
+	SelectBins []string        `json:"selectBins,omitempty"`
+	Expression string          `json:"expression,omitempty"`
+	MaxRecords int             `json:"maxRecords,omitempty"`
+	PrimaryKey string          `json:"primaryKey,omitempty"`
+	PKType     string          `json:"pkType,omitempty"`
+}
+
+// QueryResponse mirrors cluster-manager's QueryResponse.
+type QueryResponse struct {
+	Records         []AerospikeRecord `json:"records"`
+	ExecutionTimeMs int               `json:"executionTimeMs"`
+	ScannedRecords  int               `json:"scannedRecords"`
+	ReturnedRecords int               `json:"returnedRecords"`
+}
+
+// SecondaryIndex mirrors cluster-manager's SecondaryIndex.
+// Type: numeric | string | geo2dsphere. State: ready | building | error.
+type SecondaryIndex struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Set       string `json:"set"`
+	Bin       string `json:"bin"`
+	Type      string `json:"type"`
+	State     string `json:"state"`
+}
+
+// CreateIndexRequest mirrors CreateIndexRequest.
+type CreateIndexRequest struct {
+	Namespace string `json:"namespace"`
+	Set       string `json:"set"`
+	Bin       string `json:"bin"`
+	Name      string `json:"name"`
+	Type      string `json:"type"`
+}

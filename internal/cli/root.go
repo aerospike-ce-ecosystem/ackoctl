@@ -56,6 +56,8 @@ go through cluster-manager's /api/* surface.`,
 		newK8sCmd(flags),
 		newRecordCmd(flags),
 		newSetCmd(flags),
+		newQueryCmd(flags),
+		newIndexCmd(flags),
 	)
 	return cmd
 }

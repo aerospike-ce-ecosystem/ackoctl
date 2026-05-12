@@ -23,3 +23,8 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional cross-repo token for pushing the Homebrew formula.
+          # Set HOMEBREW_TAP_GITHUB_TOKEN in repository secrets when the
+          # aerospike-ce-ecosystem/homebrew-tap repo is bootstrapped; until
+          # then goreleaser's `skip_upload: auto` quietly skips the tap step.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

@@ -6,7 +6,9 @@ It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aero
 
 ## Status
 
-**P0 (skeleton)** — `version` and `config` subcommands. Resource commands land in P1+.
+**v0.1.0** — feature-complete for the control plane (connections, cluster info, k8s), data plane (records, sets), query and secondary-index management.
+
+See [docs/usage.md](docs/usage.md) for a per-command cheat sheet and [docs/install.md](docs/install.md) for build and install options.
 
 ## Install
 
@@ -43,12 +45,42 @@ Override priority: CLI flag > environment variable > config file.
 
 OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser device flow) and passed via `--token` or `ACKOCTL_TOKEN`.
 
+## Commands
+
+```
+ackoctl
+├── version
+├── config       view | set-context | use-context | current-context | delete-context
+├── connection   list | get | create | update | delete | health
+├── cluster      info | configure-namespace
+├── k8s cluster  list | get | reconcile
+├── record       list | get | put | delete | query
+├── set          list
+├── query        exec
+└── index        list | create | delete
+```
+
+See [docs/usage.md](docs/usage.md) for examples.
+
 ## Roadmap
 
-- P1: `connection`, `cluster`, `k8s` subcommands (control plane)
-- P2: `record` CRUD + `set list` (data plane)
-- P3: `query exec`, `index` CRUD
-- P4: release artifacts (brew, goreleaser), asc-workspace submodule integration
+- v0.2: admin (users/roles), UDF management, scriptable `--watch` flag
+- v0.3: workspace CRUD, multi-cluster pivot helpers
+- v1.0: stability promise after wider field testing
+
+## Releasing
+
+`ackoctl` follows SemVer. To cut a release:
+
+```bash
+# from a clean main branch
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The `release.yml` workflow runs goreleaser and publishes binaries to GitHub Releases (and, when `HOMEBREW_TAP_GITHUB_TOKEN` is configured, a Homebrew formula PR to `aerospike-ce-ecosystem/homebrew-tap`).
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

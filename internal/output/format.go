@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -122,19 +123,72 @@ func writeKeyValue(w io.Writer, prefix string, v any) error {
 			if name == "" {
 				name = strings.ToLower(f.Name)
 			}
-			fmt.Fprintf(w, "%s%s:\t%v\n", prefix, name, rv.Field(i).Interface())
+			writeField(w, prefix, name, rv.Field(i).Interface())
+		}
+		return nil
+	case reflect.Map:
+		keys := rv.MapKeys()
+		strs := make([]string, len(keys))
+		idx := make(map[string]reflect.Value, len(keys))
+		for i, k := range keys {
+			s := fmt.Sprint(k.Interface())
+			strs[i] = s
+			idx[s] = k
+		}
+		sort.Strings(strs)
+		for _, s := range strs {
+			writeField(w, prefix, s, rv.MapIndex(idx[s]).Interface())
 		}
 		return nil
 	case reflect.Slice, reflect.Array:
+		if rv.Len() == 0 {
+			fmt.Fprintf(w, "%s[]\n", prefix)
+			return nil
+		}
 		for i := 0; i < rv.Len(); i++ {
-			fmt.Fprintf(w, "%s- ", prefix)
-			if err := writeKeyValue(w, prefix+"  ", rv.Index(i).Interface()); err != nil {
-				return err
+			elem := rv.Index(i).Interface()
+			if isComposite(elem) {
+				fmt.Fprintf(w, "%s-\n", prefix)
+				if err := writeKeyValue(w, prefix+"  ", elem); err != nil {
+					return err
+				}
+				continue
 			}
+			fmt.Fprintf(w, "%s- %v\n", prefix, elem)
 		}
 		return nil
 	default:
 		fmt.Fprintf(w, "%s%v\n", prefix, v)
 		return nil
+	}
+}
+
+func writeField(w io.Writer, prefix, name string, v any) {
+	if isComposite(v) {
+		fmt.Fprintf(w, "%s%s:\n", prefix, name)
+		_ = writeKeyValue(w, prefix+"  ", v)
+		return
+	}
+	fmt.Fprintf(w, "%s%s:\t%v\n", prefix, name, v)
+}
+
+func isComposite(v any) bool {
+	if v == nil {
+		return false
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return false
+		}
+		rv = rv.Elem()
+	}
+	switch rv.Kind() {
+	case reflect.Struct, reflect.Map:
+		return true
+	case reflect.Slice, reflect.Array:
+		return rv.Len() > 0
+	default:
+		return false
 	}
 }

@@ -47,3 +47,22 @@ changelog:
 release:
   draft: false
   prerelease: auto
+
+brews:
+  - name: ackoctl
+    repository:
+      owner: aerospike-ce-ecosystem
+      name: homebrew-tap
+      branch: main
+    directory: Formula
+    homepage: "https://github.com/aerospike-ce-ecosystem/ackoctl"
+    description: "CLI for aerospike-cluster-manager — manage Aerospike CE clusters from the shell"
+    license: "Apache-2.0"
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@aerospike-ce-ecosystem
+    install: |
+      bin.install "ackoctl"
+    test: |
+      system "#{bin}/ackoctl version --short"
+    skip_upload: auto

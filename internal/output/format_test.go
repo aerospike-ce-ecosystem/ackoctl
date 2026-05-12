@@ -82,3 +82,28 @@ func TestPrintTableFallback(t *testing.T) {
 	assert.NotContains(t, out, "Hidden")
 }
 
+func TestPrintTableNestedRawMap(t *testing.T) {
+	var buf bytes.Buffer
+	info := map[string]any{
+		"name": "BB9",
+		"namespaces": []any{
+			map[string]any{
+				"name":    "test",
+				"objects": float64(12),
+				"sets":    []any{map[string]any{"name": "users"}},
+			},
+		},
+		"nodes": []any{},
+	}
+	require.NoError(t, Print(&buf, FormatTable, info))
+	out := buf.String()
+	assert.Contains(t, out, "name:")
+	assert.Contains(t, out, "BB9")
+	assert.Contains(t, out, "namespaces:")
+	assert.Contains(t, out, "test")
+	// keys must be alphabetically ordered so output is stable
+	assert.Less(t, strings.Index(out, "name:"), strings.Index(out, "namespaces:"))
+	// empty slice should not crash and should render as [] on the value column
+	assert.Regexp(t, `nodes:\s+\[\]`, out)
+}
+

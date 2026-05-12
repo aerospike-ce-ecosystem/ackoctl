@@ -37,7 +37,13 @@ jobs:
           go-version: '1.25'
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          # Pin to the last v1.x release and build it from source with the
+          # workflow's Go (1.25) so the linter's internal build-Go version
+          # matches go.mod. The pre-built v1 binary on disk ships with go1.24
+          # and refuses to lint a go-1.25 module; @latest would otherwise
+          # resolve to v2 which requires a config-format migration.
+          version: v1.64.8
+          install-mode: goinstall
           args: --timeout=5m
 
   build:

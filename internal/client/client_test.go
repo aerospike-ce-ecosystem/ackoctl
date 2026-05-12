@@ -99,6 +99,39 @@ func TestCreateConnectionFillsDefaultWorkspace(t *testing.T) {
 	assert.Equal(t, "ws-1", bodyJSON["workspaceId"], "client should inject context workspace if request omits it")
 }
 
+func TestCreateConnectionSerializesDescription(t *testing.T) {
+	var bodyJSON map[string]any
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&bodyJSON)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"new","name":"n","hosts":["h"],"port":3000,"description":"hello"}`))
+	})
+	conn, err := c.CreateConnection(context.Background(), CreateConnectionRequest{
+		Name: "n", Hosts: []string{"h"}, Port: 3000, Description: "hello",
+	})
+	require.NoError(t, err)
+	// Outgoing request uses the cluster-manager wire field name.
+	assert.Equal(t, "hello", bodyJSON["description"])
+	assert.NotContains(t, bodyJSON, "note", "must not send legacy `note` field")
+	// Response decode populates Description from the same wire field.
+	assert.Equal(t, "hello", conn.Description)
+}
+
+func TestUpdateConnectionSerializesDescription(t *testing.T) {
+	var bodyJSON map[string]any
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&bodyJSON)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"abc","name":"n","hosts":["h"],"port":3000,"description":"updated"}`))
+	})
+	desc := "updated"
+	conn, err := c.UpdateConnection(context.Background(), "abc", UpdateConnectionRequest{Description: &desc})
+	require.NoError(t, err)
+	assert.Equal(t, "updated", bodyJSON["description"])
+	assert.NotContains(t, bodyJSON, "note")
+	assert.Equal(t, "updated", conn.Description)
+}
+
 func TestConnectionHealthDecodesStatus(t *testing.T) {
 	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

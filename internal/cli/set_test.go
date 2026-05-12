@@ -12,7 +12,8 @@ func TestExtractSetsAcrossNamespaces(t *testing.T) {
 			map[string]any{
 				"name": "test",
 				"sets": []any{
-					map[string]any{"name": "users", "objects": float64(123), "memUsed": float64(4096)},
+					// memoryDataBytes is what cluster-manager 1.3.x emits today.
+					map[string]any{"name": "users", "objects": float64(123), "memoryDataBytes": float64(4096)},
 					map[string]any{"name": "orders", "object_count": float64(50)},
 				},
 			},
@@ -37,9 +38,15 @@ func TestExtractSetsAcrossNamespaces(t *testing.T) {
 	assert.Equal(t, float64(50), all[1].Objects)
 	assert.Nil(t, all[1].MemUsed)
 
-	// data-used-bytes alias
+	// data-used-bytes alias (legacy server)
 	assert.Equal(t, "events", all[2].Name)
 	assert.Equal(t, float64(99), all[2].MemUsed)
+}
+
+func TestCellStringNilBecomesEmpty(t *testing.T) {
+	assert.Equal(t, "", cellString(nil))
+	assert.Equal(t, "0", cellString(float64(0)))
+	assert.Equal(t, "4096", cellString(float64(4096)))
 }
 
 func TestExtractSetsFilterByNamespace(t *testing.T) {

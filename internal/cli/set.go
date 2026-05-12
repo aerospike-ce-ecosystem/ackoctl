@@ -56,7 +56,7 @@ func newSetListCmd(global *GlobalFlags) *cobra.Command {
 					[]string{"NAMESPACE", "SET", "OBJECTS", "MEM_USED"},
 					func(v any) []string {
 						r := v.(setRow)
-						return []string{r.Namespace, r.Name, fmt.Sprint(r.Objects), fmt.Sprint(r.MemUsed)}
+						return []string{r.Namespace, r.Name, cellString(r.Objects), cellString(r.MemUsed)}
 					},
 					func(any) []any {
 						out := make([]any, 0, len(rows))
@@ -96,7 +96,7 @@ func extractSets(info client.ClusterInfo, namespace string) []setRow {
 				Namespace: nsName,
 				Name:      name,
 				Objects:   coalesce(sm, "objects", "object_count"),
-				MemUsed:   coalesce(sm, "memUsed", "memory_used", "data-used-bytes"),
+				MemUsed:   coalesce(sm, "memoryDataBytes", "memory_data_bytes", "memUsed", "memory_used", "data-used-bytes"),
 			})
 		}
 	}
@@ -110,4 +110,14 @@ func coalesce(m map[string]any, keys ...string) any {
 		}
 	}
 	return nil
+}
+
+// cellString renders a table cell for an `any` value. A nil value becomes an
+// empty string so the table doesn't surface Go's `<nil>` to end users when a
+// cluster-info field is absent or null.
+func cellString(v any) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprint(v)
 }

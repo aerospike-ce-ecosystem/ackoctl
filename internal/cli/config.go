@@ -35,7 +35,7 @@ func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
 		Short: "Show merged ackoctl config",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			path, err := resolveConfigPath(global)
 			if err != nil {
 				return err
@@ -162,7 +162,7 @@ func newConfigCurrentContextCmd(global *GlobalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "current-context",
 		Short: "Print the current context name",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			path, err := resolveConfigPath(global)
 			if err != nil {
 				return err

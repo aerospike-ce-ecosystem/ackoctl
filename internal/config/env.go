@@ -63,13 +63,15 @@ func Resolve(cfg *Config, env, flags Overrides) (Context, error) {
 
 	var base Context
 	if name != "" {
-		if ctx, _ := cfg.Find(name); ctx != nil {
+		ctx, _ := cfg.Find(name)
+		switch {
+		case ctx != nil:
 			base = *ctx
-		} else if explicit {
+		case explicit:
 			return Context{}, fmt.Errorf("%w: %s", ErrContextNotFound, name)
-		} else if flags.Server == "" && env.Server == "" {
+		case flags.Server == "" && env.Server == "":
 			return Context{}, ErrContextNotFound
-		} else {
+		default:
 			base.Name = name
 		}
 	}

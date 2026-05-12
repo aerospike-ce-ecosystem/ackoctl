@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"context"
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -38,15 +38,22 @@ func newSetListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List sets across (or within) namespaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			info, err := c.ClusterInfo(context.Background(), args[0])
+			info, err := c.ClusterInfo(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			rows := extractSets(info, namespace)
+			var warnW io.Writer
+			if global.Verbose {
+				warnW = cmd.ErrOrStderr()
+			}
+			rows, drifted := extractSets(info, namespace, warnW)
+			if drifted && len(rows) == 0 && hasNamespaceKey(info) {
+				return fmt.Errorf("cluster info contained namespaces but none parsed — cluster-manager schema may have changed; rerun with -o json to inspect raw payload")
+			}
 			format, err := global.Format()
 			if err != nil {
 				return err
@@ -73,25 +80,58 @@ func newSetListCmd(global *GlobalFlags) *cobra.Command {
 	return cmd
 }
 
-func extractSets(info client.ClusterInfo, namespace string) []setRow {
-	nsList, _ := info["namespaces"].([]any)
-	rows := make([]setRow, 0)
-	for _, n := range nsList {
-		ns, _ := n.(map[string]any)
-		if ns == nil {
+// extractSets walks the raw cluster-info map. Each silently-skipped element
+// counts as schema drift; warnW receives a one-line warning per drift event
+// when non-nil. The returned `drifted` flag lets callers escalate to an
+// error if the cluster claimed namespaces but parsing produced zero rows.
+func extractSets(info client.ClusterInfo, namespace string, warnW io.Writer) (rows []setRow, drifted bool) {
+	rows = make([]setRow, 0)
+	rawNs, ok := info["namespaces"]
+	if !ok {
+		return rows, false
+	}
+	nsList, ok := rawNs.([]any)
+	if !ok {
+		warn(warnW, "ackoctl: cluster info `namespaces` is not a list (got %T)", rawNs)
+		return rows, true
+	}
+	for i, n := range nsList {
+		ns, ok := n.(map[string]any)
+		if !ok {
+			warn(warnW, "ackoctl: namespaces[%d] is not an object (got %T)", i, n)
+			drifted = true
 			continue
 		}
 		nsName, _ := ns["name"].(string)
+		if nsName == "" {
+			warn(warnW, "ackoctl: namespaces[%d].name is missing or non-string", i)
+			drifted = true
+		}
 		if namespace != "" && nsName != namespace {
 			continue
 		}
-		sets, _ := ns["sets"].([]any)
-		for _, s := range sets {
-			sm, _ := s.(map[string]any)
-			if sm == nil {
+		rawSets, hasSets := ns["sets"]
+		if !hasSets {
+			continue
+		}
+		sets, ok := rawSets.([]any)
+		if !ok {
+			warn(warnW, "ackoctl: namespaces[%d].sets is not a list (got %T)", i, rawSets)
+			drifted = true
+			continue
+		}
+		for j, s := range sets {
+			sm, ok := s.(map[string]any)
+			if !ok {
+				warn(warnW, "ackoctl: namespaces[%d].sets[%d] is not an object (got %T)", i, j, s)
+				drifted = true
 				continue
 			}
 			name, _ := sm["name"].(string)
+			if name == "" {
+				warn(warnW, "ackoctl: namespaces[%d].sets[%d].name is missing or non-string", i, j)
+				drifted = true
+			}
 			rows = append(rows, setRow{
 				Namespace: nsName,
 				Name:      name,
@@ -100,7 +140,25 @@ func extractSets(info client.ClusterInfo, namespace string) []setRow {
 			})
 		}
 	}
-	return rows
+	return rows, drifted
+}
+
+func hasNamespaceKey(info client.ClusterInfo) bool {
+	v, ok := info["namespaces"]
+	if !ok {
+		return false
+	}
+	if list, ok := v.([]any); ok {
+		return len(list) > 0
+	}
+	return true
+}
+
+func warn(w io.Writer, format string, args ...any) {
+	if w == nil {
+		return
+	}
+	fmt.Fprintf(w, format+"\n", args...)
 }
 
 func coalesce(m map[string]any, keys ...string) any {

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/spf13/cobra"
@@ -29,11 +28,11 @@ func newIndexListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List secondary indexes across all namespaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			idx, err := c.ListIndexes(context.Background(), args[0])
+			idx, err := c.ListIndexes(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -70,11 +69,11 @@ func newIndexCreateCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Create a secondary index",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			idx, err := c.CreateIndex(context.Background(), args[0], client.CreateIndexRequest{
+			idx, err := c.CreateIndex(cmd.Context(), args[0], client.CreateIndexRequest{
 				Namespace: namespace,
 				Set:       set,
 				Bin:       bin,
@@ -117,14 +116,14 @@ func newIndexDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteIndex(context.Background(), args[0], namespace, name); err != nil {
+			if err := c.DeleteIndex(cmd.Context(), args[0], namespace, name); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted index %s in namespace %s\n", name, namespace)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Deleted index %s in namespace %s\n", name, namespace)
 			return nil
 		},
 	}

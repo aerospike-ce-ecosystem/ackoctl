@@ -24,9 +24,9 @@ func newConfigCmd(global *GlobalFlags) *cobra.Command {
 	return cmd
 }
 
-func resolveConfigPath(global *GlobalFlags) string {
+func resolveConfigPath(global *GlobalFlags) (string, error) {
 	if global.ConfigPath != "" {
-		return global.ConfigPath
+		return global.ConfigPath, nil
 	}
 	return config.DefaultPath()
 }
@@ -36,7 +36,11 @@ func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "view",
 		Short: "Show merged ackoctl config",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(resolveConfigPath(global))
+			path, err := resolveConfigPath(global)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(path)
 			if err != nil {
 				return err
 			}
@@ -81,7 +85,10 @@ func newConfigSetContextCmd(global *GlobalFlags) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			path := resolveConfigPath(global)
+			path, err := resolveConfigPath(global)
+			if err != nil {
+				return err
+			}
 			cfg, err := config.Load(path)
 			if err != nil {
 				return err
@@ -131,7 +138,10 @@ func newConfigUseContextCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Set the current context",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := resolveConfigPath(global)
+			path, err := resolveConfigPath(global)
+			if err != nil {
+				return err
+			}
 			cfg, err := config.Load(path)
 			if err != nil {
 				return err
@@ -153,7 +163,11 @@ func newConfigCurrentContextCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "current-context",
 		Short: "Print the current context name",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(resolveConfigPath(global))
+			path, err := resolveConfigPath(global)
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(path)
 			if err != nil {
 				return err
 			}
@@ -172,7 +186,10 @@ func newConfigDeleteContextCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Remove a context",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := resolveConfigPath(global)
+			path, err := resolveConfigPath(global)
+			if err != nil {
+				return err
+			}
 			cfg, err := config.Load(path)
 			if err != nil {
 				return err

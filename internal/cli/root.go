@@ -7,16 +7,21 @@ import (
 )
 
 // GlobalFlags holds values from persistent root flags, populated by cobra
-// before any subcommand RunE fires.
+// before any subcommand RunE fires. The *Explicit fields record whether the
+// user supplied the flag on the command line, so override logic can
+// distinguish "user said false" from "user said nothing".
 type GlobalFlags struct {
-	ConfigPath      string
-	Context         string
-	Server          string
-	Token           string
-	WorkspaceID     string
-	OutputFormat    string
-	Verbose         bool
-	InsecureSkipTLS bool
+	ConfigPath              string
+	Context                 string
+	Server                  string
+	Token                   string
+	WorkspaceID             string
+	OutputFormat            string
+	Verbose                 bool
+	InsecureSkipTLS         bool
+	ContextExplicit         bool
+	WorkspaceExplicit       bool
+	InsecureSkipTLSExplicit bool
 }
 
 func (g *GlobalFlags) Format() (output.Format, error) {
@@ -37,6 +42,13 @@ It does not talk to Kubernetes or Aerospike directly — all operations
 go through cluster-manager's /api/* surface.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		PersistentPreRunE: func(c *cobra.Command, _ []string) error {
+			f := c.Flags()
+			flags.ContextExplicit = f.Changed("context")
+			flags.WorkspaceExplicit = f.Changed("workspace")
+			flags.InsecureSkipTLSExplicit = f.Changed("insecure-skip-tls")
+			return nil
+		},
 	}
 
 	cmd.PersistentFlags().StringVar(&flags.ConfigPath, "config", "", "path to ackoctl config file (default $HOME/.ackoctl/config.yaml)")

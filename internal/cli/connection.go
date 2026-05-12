@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -32,11 +31,11 @@ func newConnectionListCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "list",
 		Short: "List connection profiles",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			conns, err := c.ListConnections(context.Background(), c.Workspace)
+			conns, err := c.ListConnections(cmd.Context(), c.Workspace)
 			if err != nil {
 				return err
 			}
@@ -70,11 +69,11 @@ func newConnectionGetCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Get a connection profile",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			conn, err := c.GetConnection(context.Background(), args[0])
+			conn, err := c.GetConnection(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -103,13 +102,17 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "create",
 		Short: "Create a connection profile",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			cleanHosts, err := sanitizeHosts(hosts)
+			if err != nil {
+				return err
+			}
 			labelMap, err := parseLabels(labels)
 			if err != nil {
 				return err
 			}
 			req := client.CreateConnectionRequest{
 				Name:        name,
-				Hosts:       hosts,
+				Hosts:       cleanHosts,
 				Port:        port,
 				ClusterName: clusterName,
 				Username:    username,
@@ -119,11 +122,14 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 				Labels:      labelMap,
 				WorkspaceID: global.WorkspaceID,
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			conn, err := c.CreateConnection(context.Background(), req)
+			if req.WorkspaceID == "" && c.Workspace != "" && global.Verbose {
+				fmt.Fprintf(cmd.ErrOrStderr(), "ackoctl: creating connection in workspace=%s (from context; set --workspace to override)\n", c.Workspace)
+			}
+			conn, err := c.CreateConnection(cmd.Context(), req)
 			if err != nil {
 				return err
 			}
@@ -171,7 +177,11 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 				req.Name = &name
 			}
 			if cmd.Flags().Changed("host") {
-				req.Hosts = hosts
+				cleanHosts, err := sanitizeHosts(hosts)
+				if err != nil {
+					return err
+				}
+				req.Hosts = cleanHosts
 			}
 			if cmd.Flags().Changed("port") {
 				req.Port = &port
@@ -201,11 +211,11 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 				}
 				req.Labels = labelMap
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			conn, err := c.UpdateConnection(context.Background(), args[0], req)
+			conn, err := c.UpdateConnection(cmd.Context(), args[0], req)
 			if err != nil {
 				return err
 			}
@@ -237,17 +247,16 @@ func newConnectionDeleteCmd(global *GlobalFlags) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {
-				fmt.Fprintf(cmd.OutOrStdout(), "Refusing to delete %q without --yes\n", args[0])
-				return fmt.Errorf("confirmation required (--yes)")
+				return fmt.Errorf("refusing to delete %q without --yes", args[0])
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteConnection(context.Background(), args[0]); err != nil {
+			if err := c.DeleteConnection(cmd.Context(), args[0]); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted connection %q\n", args[0])
+			fmt.Fprintf(cmd.ErrOrStderr(), "Deleted connection %q\n", args[0])
 			return nil
 		},
 	}
@@ -261,11 +270,11 @@ func newConnectionHealthCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Probe connection health",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			st, err := c.ConnectionHealth(context.Background(), args[0])
+			st, err := c.ConnectionHealth(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -276,6 +285,27 @@ func newConnectionHealthCmd(global *GlobalFlags) *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), format, st)
 		},
 	}
+}
+
+// sanitizeHosts trims whitespace and drops empty entries. Returns an error if
+// the user supplied --host but nothing was left after cleanup, instead of
+// sending [""] which cluster-manager rejects with a confusing validation
+// error.
+func sanitizeHosts(hosts []string) ([]string, error) {
+	if len(hosts) == 0 {
+		return nil, nil
+	}
+	out := make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		h = strings.TrimSpace(h)
+		if h != "" {
+			out = append(out, h)
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("--host must contain at least one non-empty value")
+	}
+	return out, nil
 }
 
 func parseLabels(pairs []string) (map[string]string, error) {

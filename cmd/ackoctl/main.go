@@ -19,7 +19,11 @@ var (
 	date    = "unknown"
 )
 
-func main() {
+func main() { os.Exit(run()) }
+
+// run is the real entry point. main() only forwards the exit code so that
+// `os.Exit` does not skip the signal-handler cleanup `defer`s.
+func run() int {
 	cli.SetBuildInfo(cli.BuildInfo{Version: version, Commit: commit, Date: date})
 
 	// Bind ctrl-c / SIGTERM to a cancelable context so long-running scans and
@@ -30,8 +34,9 @@ func main() {
 	root := cli.NewRootCmd()
 	if err := root.ExecuteContext(ctx); err != nil {
 		printError(err)
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
 // printError gives users a single line of actionable context when something

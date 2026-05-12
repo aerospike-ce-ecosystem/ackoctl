@@ -83,3 +83,78 @@ type K8sCluster = map[string]any
 // key/value pairs. We pass it through as a map to avoid drifting against the
 // server's evolving knobs.
 type ConfigureNamespaceRequest map[string]any
+
+// RecordKey mirrors cluster-manager's RecordKey.
+type RecordKey struct {
+	Namespace string `json:"namespace"`
+	Set       string `json:"set,omitempty"`
+	PK        string `json:"pk,omitempty"`
+	Digest    string `json:"digest,omitempty"`
+}
+
+// RecordMeta mirrors cluster-manager's RecordMeta.
+type RecordMeta struct {
+	Generation   int    `json:"generation"`
+	TTL          int    `json:"ttl"`
+	LastUpdateMs *int64 `json:"lastUpdateMs,omitempty"`
+}
+
+// AerospikeRecord mirrors cluster-manager's AerospikeRecord.
+type AerospikeRecord struct {
+	Key  RecordKey      `json:"key"`
+	Meta RecordMeta     `json:"meta"`
+	Bins map[string]any `json:"bins"`
+	Note string         `json:"note,omitempty"`
+}
+
+// RecordListResponse mirrors RecordListResponse from cluster-manager.
+type RecordListResponse struct {
+	Records        []AerospikeRecord `json:"records"`
+	Total          int               `json:"total"`
+	Page           int               `json:"page"`
+	PageSize       int               `json:"pageSize"`
+	HasMore        bool              `json:"hasMore"`
+	TotalEstimated bool              `json:"totalEstimated"`
+}
+
+// RecordWriteRequest mirrors RecordWriteRequest. cluster-manager accepts
+// either snake_case or camelCase keys; we send camelCase to match the
+// canonical alias.
+type RecordWriteRequest struct {
+	Key    RecordKey      `json:"key"`
+	Bins   map[string]any `json:"bins"`
+	TTL    *int           `json:"ttl,omitempty"`
+	PKType string         `json:"pkType,omitempty"`
+}
+
+// FilteredQueryRequest mirrors the most common fields of the cluster-manager
+// FilteredQueryRequest. Filters and Predicate are passed through as raw maps
+// because the server's expression DSL is rich and evolves; CLI users supply
+// these via a single --filter JSON flag.
+type FilteredQueryRequest struct {
+	Namespace   string         `json:"namespace"`
+	Set         string         `json:"set,omitempty"`
+	PrimaryKey  string         `json:"primaryKey,omitempty"`
+	PKPattern   string         `json:"pkPattern,omitempty"`
+	PKMatchMode string         `json:"pkMatchMode,omitempty"`
+	PKType      string         `json:"pkType,omitempty"`
+	Page        int            `json:"page,omitempty"`
+	PageSize    int            `json:"pageSize,omitempty"`
+	MaxRecords  int            `json:"maxRecords,omitempty"`
+	SelectBins  []string       `json:"selectBins,omitempty"`
+	Filters     map[string]any `json:"filters,omitempty"`
+	Predicate   map[string]any `json:"predicate,omitempty"`
+}
+
+// FilteredQueryResponse mirrors FilteredQueryResponse from cluster-manager.
+type FilteredQueryResponse struct {
+	Records         []AerospikeRecord `json:"records"`
+	Total           int               `json:"total"`
+	Page            int               `json:"page"`
+	PageSize        int               `json:"pageSize"`
+	HasMore         bool              `json:"hasMore"`
+	ExecutionTimeMs int               `json:"executionTimeMs"`
+	ScannedRecords  int               `json:"scannedRecords"`
+	ReturnedRecords int               `json:"returnedRecords"`
+	TotalEstimated  bool              `json:"totalEstimated"`
+}

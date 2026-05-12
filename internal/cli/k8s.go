@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -10,6 +9,11 @@ import (
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/client"
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/output"
 )
+
+// missingFieldSentinel marks a table cell where the server response did not
+// include the expected key. Distinguishing missing from empty helps users
+// spot schema drift instead of assuming the resource has no value.
+const missingFieldSentinel = "<missing>"
 
 func newK8sCmd(global *GlobalFlags) *cobra.Command {
 	cmd := &cobra.Command{
@@ -40,11 +44,11 @@ func newK8sClusterListCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "list",
 		Short: "List ACKO-managed clusters",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			items, err := c.ListK8sClusters(context.Background())
+			items, err := c.ListK8sClusters(cmd.Context())
 			if err != nil {
 				return err
 			}
@@ -87,11 +91,11 @@ func newK8sClusterGetCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			cluster, err := c.GetK8sCluster(context.Background(), ns, name)
+			cluster, err := c.GetK8sCluster(cmd.Context(), ns, name)
 			if err != nil {
 				return err
 			}
@@ -116,11 +120,11 @@ Useful when the cluster is stuck in a drifted state.`,
 			if err != nil {
 				return err
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			out, err := c.ForceReconcileK8sCluster(context.Background(), ns, name)
+			out, err := c.ForceReconcileK8sCluster(cmd.Context(), ns, name)
 			if err != nil {
 				return err
 			}
@@ -143,7 +147,10 @@ func splitNamespacedName(s string) (string, string, error) {
 
 func stringField(m map[string]any, key string) string {
 	v, ok := m[key]
-	if !ok || v == nil {
+	if !ok {
+		return missingFieldSentinel
+	}
+	if v == nil {
 		return ""
 	}
 	switch t := v.(type) {

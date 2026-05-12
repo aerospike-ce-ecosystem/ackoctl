@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -67,11 +67,11 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 				req.Predicate = pred
 			}
 
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			resp, err := c.ExecuteQuery(context.Background(), args[0], req)
+			resp, err := c.ExecuteQuery(cmd.Context(), args[0], req)
 			if err != nil {
 				return err
 			}
@@ -97,13 +97,52 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 	return cmd
 }
 
-// parseJSONScalar accepts a JSON literal (`"foo"`, `30`, `true`, `[1,2]`) and
-// falls back to a plain string when the input is not valid JSON. This keeps
-// the UX forgiving: `--value alice` works without quoting.
+// parseJSONScalar accepts either a JSON literal (`"foo"`, `30`, `true`,
+// `[1,2]`, `{"k":1}`) or an unquoted bareword that we treat as a plain
+// string for UX (`--value alice`).
+//
+// When the input *looks* like JSON (starts with a JSON literal opener) but
+// fails to parse, we surface the error instead of silently downgrading to a
+// string, so a typo like `--value '[1,2'` does not end up as the literal
+// string predicate `"[1,2"` on the server.
 func parseJSONScalar(s string) (any, error) {
+	trimmed := strings.TrimSpace(s)
+	if looksLikeJSON(trimmed) {
+		var v any
+		if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
+			return nil, fmt.Errorf("looks like JSON but did not parse: %w", err)
+		}
+		return v, nil
+	}
 	var v any
-	if err := json.Unmarshal([]byte(s), &v); err == nil {
+	if err := json.Unmarshal([]byte(trimmed), &v); err == nil {
 		return v, nil
 	}
 	return s, nil
 }
+
+func looksLikeJSON(s string) bool {
+	if s == "" {
+		return false
+	}
+	switch s[0] {
+	case '{', '[', '"':
+		return true
+	}
+	// JSON literals: true/false/null.
+	switch s {
+	case "true", "false", "null":
+		return true
+	}
+	// Numeric: leading digit, minus, or plus sign followed by a digit or dot.
+	c := s[0]
+	if c == '-' || c == '+' {
+		if len(s) > 1 && (isDigit(s[1]) || s[1] == '.') {
+			return true
+		}
+		return false
+	}
+	return isDigit(c)
+}
+
+func isDigit(c byte) bool { return c >= '0' && c <= '9' }

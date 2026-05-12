@@ -50,8 +50,11 @@ func Print(w io.Writer, format Format, data any, opts ...Option) error {
 	case FormatYAML:
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(2)
-		defer enc.Close()
-		return enc.Encode(data)
+		if err := enc.Encode(data); err != nil {
+			_ = enc.Close()
+			return err
+		}
+		return enc.Close()
 	case FormatTable, "":
 		return writeTable(w, data, cfg)
 	default:
@@ -77,7 +80,6 @@ func WithTable(headers []string, rowFn func(any) []string, rowsFn func(any) []an
 
 func writeTable(w io.Writer, data any, cfg options) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	defer tw.Flush()
 
 	if cfg.row != nil && len(cfg.headers) > 0 {
 		fmt.Fprintln(tw, strings.Join(cfg.headers, "\t"))
@@ -88,11 +90,15 @@ func writeTable(w io.Writer, data any, cfg options) error {
 		for _, item := range items {
 			fmt.Fprintln(tw, strings.Join(cfg.row(item), "\t"))
 		}
-		return nil
+		return tw.Flush()
 	}
 
 	// Generic fallback: key: value dump.
-	return writeKeyValue(tw, "", data)
+	if err := writeKeyValue(tw, "", data); err != nil {
+		_ = tw.Flush()
+		return err
+	}
+	return tw.Flush()
 }
 
 func writeKeyValue(w io.Writer, prefix string, v any) error {
@@ -123,7 +129,9 @@ func writeKeyValue(w io.Writer, prefix string, v any) error {
 			if name == "" {
 				name = strings.ToLower(f.Name)
 			}
-			writeField(w, prefix, name, rv.Field(i).Interface())
+			if err := writeField(w, prefix, name, rv.Field(i).Interface()); err != nil {
+				return err
+			}
 		}
 		return nil
 	case reflect.Map:
@@ -137,7 +145,9 @@ func writeKeyValue(w io.Writer, prefix string, v any) error {
 		}
 		sort.Strings(strs)
 		for _, s := range strs {
-			writeField(w, prefix, s, rv.MapIndex(idx[s]).Interface())
+			if err := writeField(w, prefix, s, rv.MapIndex(idx[s]).Interface()); err != nil {
+				return err
+			}
 		}
 		return nil
 	case reflect.Slice, reflect.Array:
@@ -163,18 +173,18 @@ func writeKeyValue(w io.Writer, prefix string, v any) error {
 	}
 }
 
-func writeField(w io.Writer, prefix, name string, v any) {
+func writeField(w io.Writer, prefix, name string, v any) error {
 	v = dereference(v)
 	if v == nil {
 		fmt.Fprintf(w, "%s%s:\n", prefix, name)
-		return
+		return nil
 	}
 	if isComposite(v) {
 		fmt.Fprintf(w, "%s%s:\n", prefix, name)
-		_ = writeKeyValue(w, prefix+"  ", v)
-		return
+		return writeKeyValue(w, prefix+"  ", v)
 	}
 	fmt.Fprintf(w, "%s%s:\t%v\n", prefix, name, v)
+	return nil
 }
 
 func isComposite(v any) bool {

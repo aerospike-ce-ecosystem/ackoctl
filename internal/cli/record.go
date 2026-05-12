@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -38,11 +37,11 @@ func newRecordListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List records in a namespace/set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			page, err := c.ListRecords(context.Background(), args[0], namespace, set, pageSize)
+			page, err := c.ListRecords(cmd.Context(), args[0], namespace, set, pageSize)
 			if err != nil {
 				return err
 			}
@@ -84,11 +83,11 @@ func newRecordGetCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Get a single record by primary key",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			rec, err := c.GetRecord(context.Background(), args[0], namespace, set, pk, pkType)
+			rec, err := c.GetRecord(cmd.Context(), args[0], namespace, set, pk, pkType)
 			if err != nil {
 				return err
 			}
@@ -132,11 +131,11 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 				v := ttl
 				req.TTL = &v
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			rec, err := c.PutRecord(context.Background(), args[0], req)
+			rec, err := c.PutRecord(cmd.Context(), args[0], req)
 			if err != nil {
 				return err
 			}
@@ -173,14 +172,14 @@ func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteRecord(context.Background(), args[0], namespace, set, pk, pkType); err != nil {
+			if err := c.DeleteRecord(cmd.Context(), args[0], namespace, set, pk, pkType); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted %s.%s pk=%s\n", namespace, set, pk)
+			fmt.Fprintf(cmd.ErrOrStderr(), "Deleted %s.%s pk=%s\n", namespace, set, pk)
 			return nil
 		},
 	}
@@ -231,11 +230,11 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 				}
 				req.Predicate = m
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			resp, err := c.FilterRecords(context.Background(), args[0], req)
+			resp, err := c.FilterRecords(cmd.Context(), args[0], req)
 			if err != nil {
 				return err
 			}

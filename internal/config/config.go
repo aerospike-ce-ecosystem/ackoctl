@@ -35,15 +35,15 @@ var (
 	ErrNoCurrent       = errors.New("current-context is not set")
 )
 
-func DefaultPath() string {
+func DefaultPath() (string, error) {
 	if p := os.Getenv("ACKOCTL_CONFIG"); p != "" {
-		return p
+		return p, nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".ackoctl/config.yaml"
+		return "", fmt.Errorf("locate user home dir (set $HOME or pass --config / $ACKOCTL_CONFIG): %w", err)
 	}
-	return filepath.Join(home, ".ackoctl", "config.yaml")
+	return filepath.Join(home, ".ackoctl", "config.yaml"), nil
 }
 
 func Load(path string) (*Config, error) {

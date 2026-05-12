@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"strings"
 
@@ -29,11 +28,11 @@ func newClusterInfoCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Show cluster nodes, namespaces, and sets",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			info, err := c.ClusterInfo(context.Background(), args[0])
+			info, err := c.ClusterInfo(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
@@ -41,7 +40,12 @@ func newClusterInfoCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// ClusterInfo is a raw map — table view falls back to key:value dump.
+			// ClusterInfo is a raw map — table view falls back to key:value
+			// dump and may flatten nested fields. Hint at -o json/yaml for
+			// callers that need the full payload.
+			if global.Verbose && format == output.FormatTable {
+				fmt.Fprintln(cmd.ErrOrStderr(), "ackoctl: cluster info is a raw map; use -o json/yaml for the full payload")
+			}
 			return output.Print(cmd.OutOrStdout(), format, info)
 		},
 	}
@@ -65,15 +69,21 @@ Namespaces cannot be created at runtime — they must be defined in aerospike.co
 				if !ok {
 					return fmt.Errorf("invalid --param %q (expected key=value)", p)
 				}
+				if k == "namespace" {
+					return fmt.Errorf("--param namespace=... is reserved; use --name to set the namespace")
+				}
 				req[k] = v
 			}
-			c, err := newClient(global)
+			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			msg, err := c.ConfigureNamespace(context.Background(), args[0], req)
+			msg, err := c.ConfigureNamespace(cmd.Context(), args[0], req)
 			if err != nil {
 				return err
+			}
+			if msg == "" {
+				msg = "applied (server returned no message)"
 			}
 			fmt.Fprintln(cmd.OutOrStdout(), msg)
 			return nil

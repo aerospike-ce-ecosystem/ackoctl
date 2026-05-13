@@ -8,7 +8,7 @@ It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aero
 
 **v0.1.0** — feature-complete for the control plane (connections, cluster info, k8s), data plane (records, sets), query and secondary-index management.
 
-See [docs/usage.md](docs/usage.md) for a per-command cheat sheet and [docs/install.md](docs/install.md) for build and install options.
+See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.md](docs/install.md) for build and install options, and [docs/e2e-kind.md](docs/e2e-kind.md) for an in-cluster (kind + ACKO + cluster-manager) end-to-end test scenario.
 
 ## Install
 

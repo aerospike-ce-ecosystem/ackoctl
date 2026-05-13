@@ -1,0 +1,18 @@
+Package: ackoctl
+Architecture: amd64
+Version: 0.1.1
+Priority: optional
+Section: utils
+Maintainer: aerospike-ce-ecosystem <noreply@github.com>
+Installed-Size: 7051
+Filename: pool/main/a/ackoctl/ackoctl_0.1.1_linux_amd64.deb
+Size: 3063116
+MD5sum: 749921776c88214a1e309e3e8745743d
+SHA1: c76757987acded72838114ad053c2693a6003b3d
+SHA256: 9a22a24d1b88c04b5dfcb43859ed33fe38c4c46486bc89fde920aa387048aa6e
+SHA512: 073d5613677d16ab43245519cd042d06850f3db34b8839efde65b6a838bf1213ff32d15c884e9a203568f9dff246b58676f7d6223698c2aa2605fdc6cd9bb614
+Homepage: https://github.com/aerospike-ce-ecosystem/ackoctl
+Description: CLI for aerospike-cluster-manager — manage Aerospike CE clusters
+ on Kubernetes via the cluster-manager REST API.
+Architecture-Variant: amd64v1
+

@@ -1,0 +1,7 @@
+[ackoctl]
+name=ackoctl stable
+baseurl=https://aerospike-ce-ecosystem.github.io/ackoctl/yum/stable/$basearch
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://aerospike-ce-ecosystem.github.io/ackoctl/key.gpg

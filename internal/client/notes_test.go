@@ -110,8 +110,28 @@ func TestUpsertRecordNoteOmitsEmptyPKType(t *testing.T) {
 	})
 	_, err := c.UpsertRecordNote(context.Background(), "conn-1", "test", "users", "alice", "", "x")
 	require.NoError(t, err)
-	_, hasPKType := bodyJSON["pkType"]
-	assert.False(t, hasPKType, "empty pkType must be omitted so server applies its `auto` default")
+	// Wire key is the canonical Pydantic alias `pk_type`. Both spellings
+	// must be absent so the server applies its `auto` default.
+	_, hasAlias := bodyJSON["pk_type"]
+	_, hasFieldName := bodyJSON["pkType"]
+	assert.False(t, hasAlias, "empty pk_type must be omitted")
+	assert.False(t, hasFieldName, "empty pkType (legacy spelling) must also be omitted")
+}
+
+func TestUpsertRecordNoteSendsCanonicalAlias(t *testing.T) {
+	var bodyJSON map[string]any
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&bodyJSON))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"connectionId":"conn-1","namespace":"test","setName":"users","pkText":"42","pkType":"string","note":"x","createdAt":"t","updatedAt":"t"}`))
+	})
+	_, err := c.UpsertRecordNote(context.Background(), "conn-1", "test", "users", "42", "string", "x")
+	require.NoError(t, err)
+	// Send the alias, not the field name. populate_by_name=True accepts both
+	// today but the alias is forward-compatible if Pydantic v3 enforces it.
+	assert.Equal(t, "string", bodyJSON["pk_type"])
+	_, hasFieldName := bodyJSON["pkType"]
+	assert.False(t, hasFieldName, "must not send the field-name spelling alongside the alias")
 }
 
 func TestDeleteRecordNoteSendsPKType(t *testing.T) {

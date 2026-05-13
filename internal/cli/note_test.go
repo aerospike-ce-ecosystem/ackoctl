@@ -126,7 +126,11 @@ func TestNoteRecordUpdateSendsPKType(t *testing.T) {
 		var body map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
 		assert.Equal(t, "vip", body["note"])
-		assert.Equal(t, "string", body["pkType"])
+		// Canonical Pydantic alias is `pk_type`; verify ackoctl sends that
+		// instead of the field-name spelling.
+		assert.Equal(t, "string", body["pk_type"])
+		_, hasFieldName := body["pkType"]
+		assert.False(t, hasFieldName, "must not send pkType alongside pk_type")
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"connectionId":"conn-1","namespace":"test","setName":"users","pkText":"42","pkType":"string","note":"vip","createdAt":"t","updatedAt":"t"}`))
 	}))
@@ -137,6 +141,8 @@ func TestNoteRecordUpdateSendsPKType(t *testing.T) {
 		"--pk-type", "string", "--note", "vip",
 	)
 	require.NoError(t, err)
+	// Server responds with the resolved type as `pkType` (field name), which
+	// is what ackoctl prints in JSON output.
 	assert.Contains(t, stdout, `"pkType": "string"`)
 }
 
@@ -151,9 +157,36 @@ func TestNoteRecordDeleteSendsQuery(t *testing.T) {
 	_, stderr, err := runNoteCmd(t, srv.URL,
 		"note", "record", "delete", "conn-1",
 		"--namespace", "test", "--set", "users", "--pk", "alice", "--pk-type", "string",
+		"--yes",
 	)
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "Deleted record note")
+}
+
+func TestNoteRecordDeleteRequiresYes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unexpected server call without --yes")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runNoteCmd(t, srv.URL,
+		"note", "record", "delete", "conn-1",
+		"--namespace", "test", "--set", "users", "--pk", "alice",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--yes")
+}
+
+func TestNoteSetDeleteRequiresYes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unexpected server call without --yes")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runNoteCmd(t, srv.URL,
+		"note", "set", "delete", "conn-1",
+		"--namespace", "test", "--set", "users",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--yes")
 }
 
 func TestNoteRecordListRequiresNamespaceAndSet(t *testing.T) {

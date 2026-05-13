@@ -84,12 +84,16 @@ func newNoteSetUpdateCmd(global *GlobalFlags) *cobra.Command {
 func newNoteSetDeleteCmd(global *GlobalFlags) *cobra.Command {
 	var (
 		namespace, set string
+		yes            bool
 	)
 	cmd := &cobra.Command{
 		Use:   "delete CONN_ID",
 		Short: "Remove the operator note attached to a set (idempotent)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				return fmt.Errorf("confirmation required (--yes)")
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -103,6 +107,7 @@ func newNoteSetDeleteCmd(global *GlobalFlags) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&namespace, "namespace", "", "namespace (required)")
 	cmd.Flags().StringVar(&set, "set", "", "set name (required)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	return cmd
@@ -205,12 +210,16 @@ func newNoteRecordUpdateCmd(global *GlobalFlags) *cobra.Command {
 func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 	var (
 		namespace, set, pk, pkType string
+		yes                        bool
 	)
 	cmd := &cobra.Command{
 		Use:   "delete CONN_ID",
 		Short: "Remove the operator note on a single record (idempotent)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				return fmt.Errorf("confirmation required (--yes)")
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -226,6 +235,7 @@ func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&set, "set", "", "set name (required)")
 	cmd.Flags().StringVar(&pk, "pk", "", "primary key (required)")
 	cmd.Flags().StringVar(&pkType, "pk-type", "", "particle type for pk: auto|string|int|bytes (default auto)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")

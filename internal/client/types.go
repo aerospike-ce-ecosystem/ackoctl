@@ -258,10 +258,12 @@ type UpsertSetNoteRequest struct {
 
 // UpsertRecordNoteRequest mirrors cluster-manager's UpsertRecordNoteRequest
 // body for ``PUT /notes/records/...``. ``PKType`` defaults to ``auto`` on
-// the server when omitted; we pass it through verbatim.
+// the server when omitted; we pass it through verbatim. The wire key is the
+// canonical Pydantic alias ``pk_type`` so this keeps working if the server
+// disables ``populate_by_name`` (Pydantic v3 default).
 type UpsertRecordNoteRequest struct {
 	Note   string `json:"note"`
-	PKType string `json:"pkType,omitempty"`
+	PKType string `json:"pk_type,omitempty"`
 }
 
 // SetNotesListResponse mirrors the {"notes": [...]} envelope returned by

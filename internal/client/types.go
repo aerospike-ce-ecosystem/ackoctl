@@ -334,3 +334,65 @@ type UploadUDFRequest struct {
 	Filename string `json:"filename"`
 	Content  string `json:"content"`
 }
+
+// AerospikeUser mirrors cluster-manager's AerospikeUser. Returned by
+// ``GET /admin/{conn_id}/users``. Quota and connection counters are pointers
+// so we can distinguish "server omitted the field" (older builds) from
+// "explicit zero". Older Pydantic models always serialised the integer, but
+// the optional shape keeps ackoctl resilient if that ever changes.
+type AerospikeUser struct {
+	Username    string   `json:"username"`
+	Roles       []string `json:"roles"`
+	ReadQuota   *int     `json:"readQuota,omitempty"`
+	WriteQuota  *int     `json:"writeQuota,omitempty"`
+	Connections *int     `json:"connections,omitempty"`
+}
+
+// CreateUserRequest mirrors cluster-manager's CreateUserRequest body for
+// ``POST /admin/{conn_id}/users``. ``Roles`` is optional and omitted from
+// the wire when nil to match the Pydantic ``list[str] | None`` field.
+type CreateUserRequest struct {
+	Username string   `json:"username"`
+	Password string   `json:"password"`
+	Roles    []string `json:"roles,omitempty"`
+}
+
+// ChangePasswordRequest mirrors cluster-manager's ChangePasswordRequest body
+// for ``PATCH /admin/{conn_id}/users``. The PATCH endpoint is password-only;
+// it does not mutate roles or quotas.
+type ChangePasswordRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// RolePrivilege mirrors cluster-manager's Privilege model. ``Namespace`` and
+// ``Set`` are omitted from the wire when empty to match the
+// ``str | None`` shape — the server treats absent and null identically.
+type RolePrivilege struct {
+	Code      string `json:"code"`
+	Namespace string `json:"namespace,omitempty"`
+	Set       string `json:"set,omitempty"`
+}
+
+// AerospikeRole mirrors cluster-manager's AerospikeRole. Returned by
+// ``GET /admin/{conn_id}/roles``. Quotas are pointers for the same reason
+// as AerospikeUser.
+type AerospikeRole struct {
+	Name       string          `json:"name"`
+	Privileges []RolePrivilege `json:"privileges"`
+	Whitelist  []string        `json:"whitelist,omitempty"`
+	ReadQuota  *int            `json:"readQuota,omitempty"`
+	WriteQuota *int            `json:"writeQuota,omitempty"`
+}
+
+// CreateRoleRequest mirrors cluster-manager's CreateRoleRequest body for
+// ``POST /admin/{conn_id}/roles``. Quotas and whitelist are nillable so
+// unset values are omitted from the JSON body and the server applies its
+// own defaults rather than seeing an explicit 0 / empty list.
+type CreateRoleRequest struct {
+	Name       string          `json:"name"`
+	Privileges []RolePrivilege `json:"privileges"`
+	Whitelist  []string        `json:"whitelist,omitempty"`
+	ReadQuota  *int            `json:"readQuota,omitempty"`
+	WriteQuota *int            `json:"writeQuota,omitempty"`
+}

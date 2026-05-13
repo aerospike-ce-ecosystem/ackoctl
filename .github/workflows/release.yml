@@ -31,3 +31,14 @@ jobs:
           # Reuses the existing org-wide GH_AW_GITHUB_TOKEN secret rather
           # than minting a HOMEBREW_TAP_GITHUB_TOKEN dedicated to this flow.
           GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+
+      - name: Dispatch publish-packages workflow
+        # Releases created above ran under GITHUB_TOKEN, so GitHub's
+        # loop-prevention policy will suppress any `on: release` triggers.
+        # We dispatch the apt/yum republish explicitly with a PAT instead.
+        env:
+          GH_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+        run: |
+          gh workflow run publish-packages.yml \
+            -R ${{ github.repository }} \
+            -f tag=${{ github.ref_name }}

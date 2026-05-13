@@ -1,18 +1,17 @@
 name: publish-packages
 
-# Runs after the `release` workflow publishes a GitHub Release with .deb/.rpm
-# assets attached by goreleaser. Pulls those assets, rebuilds the APT + YUM
-# repository indexes, GPG-signs them, and pushes the result to gh-pages so
-# `apt install ackoctl` / `yum install ackoctl` keep working without manual
-# intervention.
+# Dispatched explicitly by release.yml after goreleaser finishes. We do NOT
+# use `on: release: types: [published]` because releases created by
+# goreleaser run under GITHUB_TOKEN, which GitHub deliberately suppresses
+# from firing downstream workflows (loop-prevention policy). The release
+# workflow uses `gh workflow run` with a PAT to dispatch us instead, which
+# is also re-runnable manually for any tag from the Actions UI.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to (re)publish (e.g. v0.1.1)'
+        description: 'Release tag to (re)publish (e.g. v0.1.2)'
         required: true
 
 permissions:
@@ -26,7 +25,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag }}
       APT_SUITE: stable
       APT_COMPONENT: main
       YUM_CHANNEL: stable

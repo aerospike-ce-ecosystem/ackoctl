@@ -12,38 +12,30 @@ See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.
 
 ## Install
 
-### Homebrew (macOS, Linux)
-
-```bash
-brew install aerospike-ce-ecosystem/tap/ackoctl
-```
-
-### Debian / Ubuntu (apt)
-
-```bash
-sudo install -d /etc/apt/keyrings
-curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/key.gpg \
-  | sudo gpg --dearmor -o /etc/apt/keyrings/ackoctl.gpg
-echo "deb [signed-by=/etc/apt/keyrings/ackoctl.gpg] https://aerospike-ce-ecosystem.github.io/ackoctl/apt stable main" \
-  | sudo tee /etc/apt/sources.list.d/ackoctl.list
-sudo apt update && sudo apt install ackoctl
-```
-
-### RHEL / Fedora / Rocky (dnf/yum)
-
-```bash
-sudo curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/yum/ackoctl.repo \
-  -o /etc/yum.repos.d/ackoctl.repo
-sudo dnf install ackoctl
-```
-
-### Shell one-liner (no package manager)
+### Linux & macOS (one-liner)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
 ```
 
 Detects OS/arch automatically (darwin/linux × amd64/arm64), verifies the sha256 checksum, and installs to `/usr/local/bin/ackoctl`. See [docs/install.md](docs/install.md) for pinning a version, custom `BIN_DIR`, manual install, and source build.
+
+### Homebrew (macOS)
+
+```bash
+brew install aerospike-ce-ecosystem/tap/ackoctl
+```
+
+### Upgrade
+
+Once `ackoctl` is on `$PATH` it can upgrade itself:
+
+```bash
+ackoctl upgrade           # pull the latest release
+ackoctl upgrade --check   # report current vs latest, do not install
+```
+
+Every command also runs a once-a-day check against the GitHub Releases page and prints a one-line warning when a newer tag is available. Disable with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
 
 ## Quick start
 
@@ -76,6 +68,7 @@ OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser devic
 ```
 ackoctl
 ├── version
+├── upgrade
 ├── config       view | set-context | use-context | current-context | delete-context
 ├── connection   list | get | create | update | delete | health
 ├── cluster      info | configure-namespace
@@ -104,18 +97,13 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Tagging triggers two workflows:
-
-1. `release.yml` → goreleaser builds binaries + `.tar.gz` + `.deb` + `.rpm` + `.apk`, uploads them to the GitHub Release, and (with `GH_AW_GITHUB_TOKEN` set) bumps the formula in `aerospike-ce-ecosystem/homebrew-tap`.
-2. `publish-packages.yml` (fires on `release.published`) → downloads the `.deb`/`.rpm` assets, rebuilds the APT + YUM repository metadata on the `gh-pages` branch, GPG-signs everything, and pushes. `apt install ackoctl` / `dnf install ackoctl` start serving the new version within a minute.
+Tagging triggers `release.yml` → goreleaser builds per-OS/arch `.tar.gz` archives and `checksums.txt`, uploads them to the GitHub Release alongside `install.sh`, and (with `GH_AW_GITHUB_TOKEN` set) bumps the formula in `aerospike-ce-ecosystem/homebrew-tap`.
 
 Required repository secrets:
 
 | Secret | Purpose |
 |--------|---------|
 | `GH_AW_GITHUB_TOKEN` | PAT with `Contents: write` on `aerospike-ce-ecosystem/homebrew-tap` |
-| `GPG_PRIVATE_KEY` | ASCII-armored private key (`gpg --armor --export-secret-keys`) for signing APT/YUM metadata and `.rpm` packages |
-| `GPG_PASSPHRASE` | Passphrase for the above key (set empty if the key has none) |
 
 One-time setup for the operator is documented in [docs/release-setup.md](docs/release-setup.md).
 

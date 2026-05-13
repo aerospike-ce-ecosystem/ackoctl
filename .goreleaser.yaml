@@ -31,31 +31,6 @@ archives:
       - README.md
       - install.sh
 
-nfpms:
-  - id: ackoctl
-    package_name: ackoctl
-    file_name_template: >-
-      {{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
-    ids: [ackoctl]
-    vendor: aerospike-ce-ecosystem
-    homepage: https://github.com/aerospike-ce-ecosystem/ackoctl
-    maintainer: aerospike-ce-ecosystem <noreply@github.com>
-    description: |
-      CLI for aerospike-cluster-manager — manage Aerospike CE clusters
-      on Kubernetes via the cluster-manager REST API.
-    license: Apache-2.0
-    formats: [deb, rpm, apk]
-    bindir: /usr/bin
-    section: utils
-    priority: optional
-    contents:
-      - src: LICENSE
-        dst: /usr/share/doc/ackoctl/LICENSE
-      - src: README.md
-        dst: /usr/share/doc/ackoctl/README.md
-    rpm:
-      group: Applications/System
-
 brews:
   - name: ackoctl
     ids: [ackoctl]

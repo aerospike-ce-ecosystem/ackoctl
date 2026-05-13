@@ -109,6 +109,8 @@ ackoctl record query <CONN_ID> \
   --select=name,age --page-size=50
 ```
 
+`--bins` takes the **entire bin set as a single JSON object** — not repeatable key/value pairs. `--bins='{"name":"Alice","age":30}'` is correct; `--bins=name=Alice --bins=age=30` returns `--bins must be a JSON object`. JSON typing is preserved end-to-end, so numbers stay numbers and quoted strings stay strings.
+
 `--filter` and `--predicate` accept raw JSON to pass through cluster-manager's `FilterGroup` / `QueryPredicate` DSL when you need the full power.
 
 `--pk-type` lets you pin the particle type (`auto|string|int|bytes`). With `auto` cluster-manager will retry the alternate type on `NOT_FOUND`.
@@ -156,6 +158,77 @@ ackoctl index delete <CONN_ID> --namespace=test --name=idx_age --yes
 ```
 
 `--type` is one of `numeric | string | geo2dsphere`.
+
+---
+
+## info — asinfo passthrough
+
+```bash
+# Fan-out across every reachable node
+ackoctl info <CONN_ID> --command=build --command=status
+
+# Target a single node
+ackoctl info <CONN_ID> --command=statistics --node=BB9020011AC4202
+
+# Forward a write verb (off the read-only whitelist)
+ackoctl info <CONN_ID> --allow-write --command='set-config:context=service;proto-fd-max=20000'
+```
+
+cluster-manager enforces a read-only whitelist by default (`build`, `status`, `statistics`, `namespaces`, `namespace/<ns>`, ...). `--allow-write` bypasses the whitelist so verbs such as `set-config:` go through. One row per `(node, command)` pair is returned.
+
+---
+
+## admin — Aerospike security users and roles
+
+Requires `security { enable-security true }` on the target cluster. **Aerospike Community Edition does not ship the security module**, so every admin call fails on a CE cluster — this group is here for Enterprise targets that cluster-manager happens to know about.
+
+```bash
+# Users
+ackoctl admin user list   <CONN_ID>
+ackoctl admin user create <CONN_ID> --username=alice --password-stdin --roles=read,write <<<'s3cret'
+ackoctl admin user passwd <CONN_ID> --username=alice --password-stdin <<<'new-s3cret'
+ackoctl admin user delete <CONN_ID> --username=alice --yes
+
+# Roles
+ackoctl admin role list   <CONN_ID>
+ackoctl admin role create <CONN_ID> --name=analyst --privileges=read.test,sindex-admin.test
+ackoctl admin role delete <CONN_ID> --name=analyst --yes
+```
+
+Prefer `--password-stdin` over `--password` — the plaintext form ends up in shell history.
+
+---
+
+## note — operator memos stored in cluster-manager
+
+Notes are free-text annotations stored in cluster-manager's metaDB (not in Aerospike itself). They are scoped per connection profile and cascade-delete with the connection. Use them for runbook context, ticket references, or known-issue markers.
+
+```bash
+# Set-level notes
+ackoctl note set list   <CONN_ID>
+ackoctl note set update <CONN_ID> --namespace=test --set=users --note='Migrated from legacy cluster on 2026-01-15'
+ackoctl note set delete <CONN_ID> --namespace=test --set=users --yes
+
+# Record-level notes (note body up to 8 KB)
+ackoctl note record list   <CONN_ID> --namespace=test --set=users
+ackoctl note record update <CONN_ID> --namespace=test --set=users --pk=alice --note='VIP — see ticket OPS-1234'
+ackoctl note record delete <CONN_ID> --namespace=test --set=users --pk=alice --yes
+```
+
+---
+
+## udf — Lua user-defined functions
+
+Only Lua is supported on Aerospike CE. Requests pass through cluster-manager's `/api/v1/udfs` surface (single JSON `{"filename":..., "content":<source>}` body, not multipart).
+
+```bash
+ackoctl udf list   <CONN_ID>
+ackoctl udf upload <CONN_ID> --file=./helpers.lua                 # filename defaults to basename
+ackoctl udf upload <CONN_ID> --file=./helpers.lua --filename=my_module.lua
+ackoctl udf remove <CONN_ID> --filename=my_module.lua --yes
+```
+
+cluster-manager validates `--filename` against `^[a-zA-Z0-9_.-]{1,255}$`; invalid names come back as HTTP 422.
 
 ---
 

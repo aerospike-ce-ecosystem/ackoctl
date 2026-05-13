@@ -52,7 +52,10 @@ esac
 
 if [ -z "$VERSION" ]; then
   log "resolving latest release"
-  REDIRECT=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest")
+  REDIRECT=$(curl -fsSLI --retry 3 --retry-delay 2 --retry-connrefused \
+    -o /dev/null -w '%{url_effective}' \
+    "https://github.com/$REPO/releases/latest") \
+    || err "could not reach https://github.com/$REPO/releases/latest"
   TAG="${REDIRECT##*/}"
   case "$TAG" in
     v*) VERSION="$TAG" ;;
@@ -78,12 +81,14 @@ TMP=$(mktemp -d 2>/dev/null || mktemp -d -t ackoctl)
 trap 'rm -rf "$TMP"' EXIT
 
 log "downloading $URL"
-curl -fsSL --retry 3 -o "$TMP/$ARCHIVE" "$URL" \
+curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
+  -o "$TMP/$ARCHIVE" "$URL" \
   || err "download failed; check that release $VERSION has the asset $ARCHIVE"
 
 # --- Checksum verification ---------------------------------------------------
 
-if curl -fsSL --retry 3 -o "$TMP/checksums.txt" "$CHECKSUM_URL"; then
+if curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
+    -o "$TMP/checksums.txt" "$CHECKSUM_URL"; then
   log "verifying checksum"
   EXPECTED=$(grep " $ARCHIVE\$" "$TMP/checksums.txt" | awk '{print $1}')
   if [ -z "$EXPECTED" ]; then

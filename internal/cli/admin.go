@@ -131,7 +131,7 @@ func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&username, "username", "", "username (required)")
-	cmd.Flags().StringVar(&password, "password", "", "password (use --password-stdin to read from stdin instead)")
+	cmd.Flags().StringVar(&password, "password", "", "password in plaintext — visible in shell history; prefer --password-stdin")
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read password from stdin (mutually exclusive with --password)")
 	cmd.Flags().StringSliceVar(&roles, "roles", nil, "comma-separated role names to assign (optional)")
 	_ = cmd.MarkFlagRequired("username")
@@ -174,7 +174,7 @@ password-only.`,
 		},
 	}
 	cmd.Flags().StringVar(&username, "username", "", "username (required)")
-	cmd.Flags().StringVar(&password, "password", "", "new password (use --password-stdin to read from stdin instead)")
+	cmd.Flags().StringVar(&password, "password", "", "new password in plaintext — visible in shell history; prefer --password-stdin")
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read password from stdin (mutually exclusive with --password)")
 	_ = cmd.MarkFlagRequired("username")
 	return cmd
@@ -392,6 +392,12 @@ func parsePrivileges(specs []string) ([]client.RolePrivilege, error) {
 			ns = strings.TrimSpace(ns)
 			if ns == "" {
 				return nil, fmt.Errorf("--privilege %q: namespace is empty after ':'", raw)
+			}
+			// Reject embedded delimiters: a second ':' in the namespace
+			// section indicates a malformed spec like "read::" or "read:a:b"
+			// that previous code silently accepted (ns became ":" or "a:b").
+			if strings.ContainsAny(ns, ":/") {
+				return nil, fmt.Errorf("--privilege %q: namespace must not contain ':' or '/'", raw)
 			}
 			p.Namespace = ns
 			if hasSet {

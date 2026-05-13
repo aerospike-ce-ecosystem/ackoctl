@@ -94,6 +94,19 @@ func TestParsePrivilegesRejectsEmptySet(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParsePrivilegesRejectsDoubleColon(t *testing.T) {
+	// "read::" must not silently produce namespace = ":" — the second colon
+	// is malformed and should surface a clear CLI error.
+	_, err := parsePrivileges([]string{"read::"})
+	require.Error(t, err)
+}
+
+func TestParsePrivilegesRejectsColonInNamespace(t *testing.T) {
+	// "read:a:b" likewise must not produce namespace = "a:b".
+	_, err := parsePrivileges([]string{"read:a:b"})
+	require.Error(t, err)
+}
+
 // ---------------------------------------------------------------------------
 // resolvePassword
 // ---------------------------------------------------------------------------

@@ -139,13 +139,19 @@ Useful when the cluster is stuck in a drifted state.`,
 }
 
 func newK8sClusterScaleCmd(global *GlobalFlags) *cobra.Command {
-	var size int
+	var (
+		size int
+		yes  bool
+	)
 	cmd := &cobra.Command{
 		Use:   "scale NAMESPACE/NAME --size N",
 		Short: "Scale an ACKO-managed cluster to N nodes",
 		Long: `Patches spec.size on the AerospikeCluster CR via
 POST /k8s/clusters/{ns}/{name}/scale. CE caps the cluster at 8 nodes; both
-the CLI and the server reject sizes outside 1..8.`,
+the CLI and the server reject sizes outside 1..8.
+
+Scale-down (target < current size) requires --yes/-y because shrinking
+the cluster ejects nodes and can lose data on unreplicated partitions.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if size < 1 || size > 8 {
@@ -158,6 +164,13 @@ the CLI and the server reject sizes outside 1..8.`,
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
+			}
+			current, err := c.GetK8sCluster(cmd.Context(), ns, name)
+			if err != nil {
+				return err
+			}
+			if cur, ok := intField(current, "size"); ok && size < cur && !yes {
+				return fmt.Errorf("refusing scale-down %d -> %d without --yes (data-loss risk on unreplicated partitions)", cur, size)
 			}
 			out, err := c.ScaleK8sCluster(cmd.Context(), ns, name, size)
 			if err != nil {
@@ -186,9 +199,28 @@ the CLI and the server reject sizes outside 1..8.`,
 			)
 		},
 	}
-	cmd.Flags().IntVar(&size, "size", 0, "target node count (1..8, CE cap)")
+	cmd.Flags().IntVar(&size, "size", 1, "target node count (1..8, CE cap)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm scale-down (required when target < current size)")
 	_ = cmd.MarkFlagRequired("size")
 	return cmd
+}
+
+// intField extracts an integer from a map[string]any returned by the API.
+// JSON numbers decode as float64; int/int64 are accepted for robustness.
+func intField(m map[string]any, key string) (int, bool) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return 0, false
+	}
+	switch t := v.(type) {
+	case float64:
+		return int(t), true
+	case int:
+		return t, true
+	case int64:
+		return int(t), true
+	}
+	return 0, false
 }
 
 func splitNamespacedName(s string) (string, string, error) {

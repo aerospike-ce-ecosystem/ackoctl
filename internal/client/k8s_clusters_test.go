@@ -99,3 +99,59 @@ func TestListK8sClusterEventsSurfacesAPIError(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
 }
+
+func TestGetK8sPodLogsBuildsPathAndQuery(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/k8s/clusters/ns/c1/pods/c1-rack1-0/logs", r.URL.Path)
+		q := r.URL.Query()
+		assert.Equal(t, "200", q.Get("tail"))
+		assert.Equal(t, "aerospike", q.Get("container"))
+		assert.Equal(t, "1800", q.Get("since_seconds"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"pod":"c1-rack1-0","logs":"line1\nline2\n","tailLines":200,"sinceSeconds":1800}`))
+	})
+
+	out, err := c.GetK8sPodLogs(context.Background(), "ns", "c1", "c1-rack1-0", K8sLogsOptions{
+		Container:    "aerospike",
+		Tail:         200,
+		SinceSeconds: 1800,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "c1-rack1-0", out.Pod)
+	assert.Equal(t, "line1\nline2\n", out.Logs)
+	assert.Equal(t, 200, out.TailLines)
+	require.NotNil(t, out.SinceSeconds)
+	assert.Equal(t, 1800, *out.SinceSeconds)
+}
+
+func TestGetK8sPodLogsOmitsOptionalQueryParams(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		assert.False(t, q.Has("tail"), "tail must not be sent when zero")
+		assert.False(t, q.Has("container"), "container must not be sent when empty")
+		assert.False(t, q.Has("since_seconds"), "since_seconds must not be sent when zero")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"pod":"p","logs":"","tailLines":500}`))
+	})
+
+	out, err := c.GetK8sPodLogs(context.Background(), "ns", "c1", "p", K8sLogsOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "p", out.Pod)
+	assert.Equal(t, 500, out.TailLines)
+	assert.Nil(t, out.SinceSeconds, "server-omitted sinceSeconds should round-trip as nil")
+}
+
+func TestGetK8sPodLogsSurfacesNotFound(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Pod 'ghost' does not belong to cluster 'c1'"}`))
+	})
+
+	_, err := c.GetK8sPodLogs(context.Background(), "ns", "c1", "ghost", K8sLogsOptions{Tail: 100})
+	require.Error(t, err)
+	var apiErr *APIError
+	require.True(t, errors.As(err, &apiErr))
+	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
+	assert.Contains(t, apiErr.Detail, "ghost")
+}

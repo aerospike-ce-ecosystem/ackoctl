@@ -65,3 +65,29 @@ func (c *BaseClient) ListK8sClusterEvents(ctx context.Context, namespace, name s
 	}
 	return out, nil
 }
+
+// GetK8sPodLogs fetches kubelet logs for a pod owned by an ACKO-managed
+// cluster via GET /k8s/clusters/{ns}/{name}/pods/{pod}/logs. The server bounds
+// tail to 1..10000 and since_seconds to 1..86400; we leave numeric validation
+// to the caller so a CLI flag parser can surface friendly messages. A
+// zero-value Tail uses the server default (500); a zero-value Container or
+// SinceSeconds omits the corresponding query param.
+func (c *BaseClient) GetK8sPodLogs(ctx context.Context, namespace, name, pod string, opts K8sLogsOptions) (K8sPodLogs, error) {
+	out := K8sPodLogs{}
+	q := url.Values{}
+	if opts.Tail > 0 {
+		q.Set("tail", strconv.Itoa(opts.Tail))
+	}
+	if opts.Container != "" {
+		q.Set("container", opts.Container)
+	}
+	if opts.SinceSeconds > 0 {
+		q.Set("since_seconds", strconv.Itoa(opts.SinceSeconds))
+	}
+	path := "/k8s/clusters/" + url.PathEscape(namespace) + "/" + url.PathEscape(name) +
+		"/pods/" + url.PathEscape(pod) + "/logs"
+	if err := c.Do(ctx, http.MethodGet, path, nil, q, &out); err != nil {
+		return K8sPodLogs{}, err
+	}
+	return out, nil
+}

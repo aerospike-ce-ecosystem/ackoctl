@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/client"
 )
@@ -97,4 +98,38 @@ func TestFilterEventsSinceEmptyInput(t *testing.T) {
 	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
 	got := filterEventsSince(nil, 5*time.Minute, now)
 	assert.Empty(t, got)
+}
+
+func TestSinceFlagToSecondsZero(t *testing.T) {
+	got, err := sinceFlagToSeconds(0)
+	require.NoError(t, err)
+	assert.Equal(t, 0, got, "zero duration means --since not set")
+}
+
+func TestSinceFlagToSecondsWholeSeconds(t *testing.T) {
+	got, err := sinceFlagToSeconds(30 * time.Second)
+	require.NoError(t, err)
+	assert.Equal(t, 30, got)
+}
+
+func TestSinceFlagToSecondsRoundsUp(t *testing.T) {
+	got, err := sinceFlagToSeconds(1500 * time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, 2, got, "1.5s rounds up to 2s so caller does not lose logs")
+
+	got, err = sinceFlagToSeconds(500 * time.Millisecond)
+	require.NoError(t, err)
+	assert.Equal(t, 1, got, "sub-1s requests round up to the server's minimum of 1s")
+}
+
+func TestSinceFlagToSecondsRejectsOverMax(t *testing.T) {
+	_, err := sinceFlagToSeconds(25 * time.Hour)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "between 1s and 24h")
+}
+
+func TestSinceFlagToSecondsAt24h(t *testing.T) {
+	got, err := sinceFlagToSeconds(24 * time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, 86400, got, "boundary value should be accepted")
 }

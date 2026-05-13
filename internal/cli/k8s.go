@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,7 @@ func newK8sClusterCmd(global *GlobalFlags) *cobra.Command {
 		newK8sClusterReconcileCmd(global),
 		newK8sClusterScaleCmd(global),
 		newK8sClusterEventsCmd(global),
+		newK8sClusterLogsCmd(global),
 	)
 	return cmd
 }
@@ -332,6 +334,88 @@ func parseEventTimestamp(e client.K8sClusterEvent) (time.Time, bool) {
 		}
 	}
 	return time.Time{}, false
+}
+
+// newK8sClusterLogsCmd wires `ackoctl k8s cluster logs NAMESPACE/NAME --pod
+// POD ...`. Default output is the raw log string (kubectl-style); -o json|yaml
+// emits the full response envelope so users can pipe pod/tailLines/sinceSeconds
+// into other tools. We validate tail and --since client-side to match the
+// FastAPI bounds (1..10000 and 1..86400 seconds) and surface a friendly error
+// before round-tripping to the server.
+func newK8sClusterLogsCmd(global *GlobalFlags) *cobra.Command {
+	var (
+		pod       string
+		container string
+		tail      int
+		since     time.Duration
+	)
+	cmd := &cobra.Command{
+		Use:   "logs NAMESPACE/NAME",
+		Short: "Fetch logs from a pod in an ACKO-managed cluster",
+		Long: `Reads kubelet logs for a single pod owned by the named AerospikeCluster.
+By default prints the raw log string to stdout (like 'kubectl logs').
+Use -o json or -o yaml to emit the full {pod, logs, tailLines, sinceSeconds}
+envelope. Streaming (--follow) is not supported.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ns, name, err := splitNamespacedName(args[0])
+			if err != nil {
+				return err
+			}
+			if tail < 1 || tail > 10000 {
+				return fmt.Errorf("--tail must be between 1 and 10000, got %d", tail)
+			}
+			sinceSeconds, err := sinceFlagToSeconds(since)
+			if err != nil {
+				return err
+			}
+			c, err := newClient(cmd, global)
+			if err != nil {
+				return err
+			}
+			result, err := c.GetK8sPodLogs(cmd.Context(), ns, name, pod, client.K8sLogsOptions{
+				Container:    container,
+				Tail:         tail,
+				SinceSeconds: sinceSeconds,
+			})
+			if err != nil {
+				return err
+			}
+			format, err := global.Format()
+			if err != nil {
+				return err
+			}
+			if format == output.FormatTable {
+				// Match kubectl: emit only the raw logs payload, preserving any
+				// trailing newline the kubelet returned. The envelope (pod,
+				// tailLines, sinceSeconds) is JSON/YAML-only metadata.
+				_, err := fmt.Fprint(cmd.OutOrStdout(), result.Logs)
+				return err
+			}
+			return output.Print(cmd.OutOrStdout(), format, result)
+		},
+	}
+	cmd.Flags().StringVar(&pod, "pod", "", "pod name (required)")
+	cmd.Flags().StringVar(&container, "container", "", "container name within the pod")
+	cmd.Flags().IntVar(&tail, "tail", 500, "number of tail lines to return (1..10000)")
+	cmd.Flags().DurationVar(&since, "since", 0, "only return logs newer than this duration (e.g. 30m, 1h; max 24h)")
+	_ = cmd.MarkFlagRequired("pod")
+	return cmd
+}
+
+// sinceFlagToSeconds converts a --since duration into the integer seconds the
+// FastAPI logs endpoint expects. Zero means "not set" -> 0. Sub-second
+// precision is rounded UP so users get at least the requested window;
+// truncating down would silently return fewer logs than asked for.
+func sinceFlagToSeconds(d time.Duration) (int, error) {
+	if d <= 0 {
+		return 0, nil
+	}
+	secs := int(math.Ceil(d.Seconds()))
+	if secs < 1 || secs > 86400 {
+		return 0, fmt.Errorf("--since must resolve to between 1s and 24h, got %s", d)
+	}
+	return secs, nil
 }
 
 func splitNamespacedName(s string) (string, string, error) {

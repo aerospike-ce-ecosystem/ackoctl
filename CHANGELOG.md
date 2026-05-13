@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- **`ackoctl upgrade`** — in-place self-update. Resolves the latest tag from GitHub Releases, downloads the matching `tar.gz`, verifies the sha256 against `checksums.txt`, and atomically replaces the running binary. `--check` reports current vs. latest without installing; `--version vX.Y.Z` pins a specific release.
+- **Startup version check** — every command (except `version`, `upgrade`, `help`, `completion`, and dev builds) consults a 24 h cache at `~/.ackoctl/.version-check.json` and prints a one-line stderr warning when a newer tag is available. Cache misses spawn a 1.5 s background refresh; opt out via `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
+
+### Changed
+
+- **Linux install path simplified.** The shell one-liner (`curl … install.sh | sh`) is now the only documented channel on Linux. The signed APT / YUM repositories on `gh-pages` are retired — `install.sh` already covers OS/arch detection, sha256 verification, and `~/.local/bin` fallback. Homebrew remains the macOS channel.
+- **Goreleaser** — dropped the `nfpms` block; releases no longer ship `.deb` / `.rpm` / `.apk` artifacts. Only per-OS/arch `tar.gz` + `checksums.txt` + `install.sh` are uploaded.
+- **Workflows** — `publish-packages.yml` (the `gh-pages` republish) and its dispatch step in `release.yml` removed. `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` repository secrets are no longer consumed by CI.
+
+### Migration
+
+- `apt install ackoctl` / `dnf install ackoctl` users: reinstall via `curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh`, then `sudo rm /etc/apt/sources.list.d/ackoctl.list /etc/apt/keyrings/ackoctl.gpg` (or the equivalent yum repo files) to silence stale `apt update` warnings.
+- After this release, `ackoctl upgrade` is the recommended way to stay current. Homebrew users keep using `brew upgrade ackoctl`.
+
 ## [0.1.0] — 2026-05-12
 
 First public release. Feature-complete coverage of the cluster-manager REST surface for everyday control-plane and data-plane work.

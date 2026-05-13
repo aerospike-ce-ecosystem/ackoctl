@@ -424,3 +424,33 @@ type CreateRoleRequest struct {
 	ReadQuota  *int            `json:"readQuota,omitempty"`
 	WriteQuota *int            `json:"writeQuota,omitempty"`
 }
+
+// InfoCommandResult mirrors cluster-manager's per-(node, command) row in the
+// asinfo passthrough response. ``Output`` carries the raw asinfo payload
+// verbatim — typically a string like ``"8.1.0.0"`` for ``build`` or a
+// semicolon-delimited stat blob for ``statistics``. ``Error`` is set when a
+// single node failed while peers succeeded (partial fan-out), so callers can
+// surface a row-level failure without losing the rest of the matrix.
+type InfoCommandResult struct {
+	Command string `json:"command"`
+	Node    string `json:"node"`
+	Output  string `json:"output"`
+	Error   string `json:"error,omitempty"`
+}
+
+// ExecuteInfoRequest mirrors cluster-manager's request body for
+// ``POST /clusters/{conn_id}/info``. ``Node`` is optional — when empty the
+// server fans out across all nodes (one result per node per command).
+// ``ReadOnly`` defaults to true on the wire; when false the server bypasses
+// its asinfo verb whitelist and forwards any command (write-capable).
+type ExecuteInfoRequest struct {
+	Commands []string `json:"commands"`
+	Node     string   `json:"node,omitempty"`
+	ReadOnly bool     `json:"readOnly"`
+}
+
+// ExecuteInfoResponse mirrors the ``{"results": [...]}`` envelope returned by
+// ``POST /clusters/{conn_id}/info``.
+type ExecuteInfoResponse struct {
+	Results []InfoCommandResult `json:"results"`
+}

@@ -164,7 +164,7 @@ func TestListK8sPodsRoundTrip(t *testing.T) {
 				"podSpecHash":"sha256:def",
 				"accessEndpoints":["10.0.0.1:3000","aerospike.example.com:3000"],
 				"servicePort":3000,
-				"clusterPort":3002
+				"podPort":3002
 			},
 			{
 				"name":"c1-rack1-1",
@@ -180,7 +180,7 @@ func TestListK8sPodsRoundTrip(t *testing.T) {
 				"podSpecHash":"sha256:old",
 				"accessEndpoints":["10.0.0.2:3000"],
 				"servicePort":3000,
-				"clusterPort":3002
+				"podPort":3002
 			},
 			{
 				"name":"c1-rack2-0",
@@ -209,8 +209,8 @@ func TestListK8sPodsRoundTrip(t *testing.T) {
 	assert.Equal(t, []string{"10.0.0.1:3000", "aerospike.example.com:3000"}, pods[0].AccessEndpoints)
 	require.NotNil(t, pods[0].ServicePort)
 	assert.Equal(t, 3000, *pods[0].ServicePort)
-	require.NotNil(t, pods[0].ClusterPort)
-	assert.Equal(t, 3002, *pods[0].ClusterPort)
+	require.NotNil(t, pods[0].PodPort)
+	assert.Equal(t, 3002, *pods[0].PodPort)
 	assert.Equal(t, "Synced", pods[0].DynamicConfigStatus)
 
 	// Not-ready but still scheduled: configHash matches the cluster but
@@ -231,7 +231,7 @@ func TestListK8sPodsRoundTrip(t *testing.T) {
 	assert.Empty(t, pods[2].NodeID)
 	assert.Nil(t, pods[2].RackID)
 	assert.Nil(t, pods[2].ServicePort)
-	assert.Nil(t, pods[2].ClusterPort)
+	assert.Nil(t, pods[2].PodPort)
 	assert.Nil(t, pods[2].AccessEndpoints)
 }
 

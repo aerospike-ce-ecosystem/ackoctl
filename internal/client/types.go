@@ -107,20 +107,24 @@ type K8sClusterEvent struct {
 // first sync, RackId for non-rack-aware clusters). Slices use nil-as-omitted
 // semantics so JSON round-trips preserve "field absent" vs "empty list".
 type K8sPodStatus struct {
-	Name                string   `json:"name"`
-	PodIP               string   `json:"podIP,omitempty"`
-	HostIP              string   `json:"hostIP,omitempty"`
-	IsReady             bool     `json:"isReady"`
-	Phase               string   `json:"phase,omitempty"`
-	Image               string   `json:"image,omitempty"`
-	DynamicConfigStatus string   `json:"dynamicConfigStatus,omitempty"`
-	NodeID              string   `json:"nodeId,omitempty"`
-	RackID              *int     `json:"rackId,omitempty"`
-	ConfigHash          string   `json:"configHash,omitempty"`
-	PodSpecHash         string   `json:"podSpecHash,omitempty"`
-	AccessEndpoints     []string `json:"accessEndpoints,omitempty"`
-	ServicePort         *int     `json:"servicePort,omitempty"`
-	ClusterPort         *int     `json:"clusterPort,omitempty"`
+	Name                     string   `json:"name"`
+	PodIP                    string   `json:"podIP,omitempty"`
+	HostIP                   string   `json:"hostIP,omitempty"`
+	IsReady                  bool     `json:"isReady"`
+	ReadinessGateSatisfied   *bool    `json:"readinessGateSatisfied,omitempty"`
+	Phase                    string   `json:"phase,omitempty"`
+	Image                    string   `json:"image,omitempty"`
+	DynamicConfigStatus      string   `json:"dynamicConfigStatus,omitempty"`
+	NodeID                   string   `json:"nodeId,omitempty"`
+	RackID                   *int     `json:"rackId,omitempty"`
+	ConfigHash               string   `json:"configHash,omitempty"`
+	PodSpecHash              string   `json:"podSpecHash,omitempty"`
+	AccessEndpoints          []string `json:"accessEndpoints,omitempty"`
+	ServicePort              *int     `json:"servicePort,omitempty"`
+	// PodPort is Aerospike's pod-port (the inter-pod fabric/cluster mesh port).
+	// The server's K8sPodStatus uses the JSON key `podPort`; an earlier draft
+	// of this client used `clusterPort` which never decoded.
+	PodPort                  *int     `json:"podPort,omitempty"`
 }
 
 // K8sLogsOptions carries the optional query parameters for

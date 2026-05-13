@@ -312,3 +312,25 @@ type SetNotesListResponse struct {
 type RecordNotesListResponse struct {
 	Notes []RecordNote `json:"notes"`
 }
+
+// UDFModule mirrors cluster-manager's UDFModule from
+// ``aerospike_cluster_manager_api.models.udf``. Type is fixed to ``"LUA"``
+// today (the only language Aerospike CE supports). ``Content`` is only set on
+// the upload response when the post-upload re-fetch can't find the module,
+// otherwise it is omitted.
+type UDFModule struct {
+	Filename string `json:"filename"`
+	Type     string `json:"type"`
+	Hash     string `json:"hash"`
+	Content  string `json:"content,omitempty"`
+}
+
+// UploadUDFRequest mirrors cluster-manager's UploadUDFRequest body for
+// ``POST /udfs/{conn_id}``. ``Content`` is the raw Lua source as a JSON
+// string — the server writes it to disk and registers via aerospike-py's
+// ``udf_put``. ``Filename`` is validated server-side against
+// ``^[a-zA-Z0-9_.-]{1,255}$``.
+type UploadUDFRequest struct {
+	Filename string `json:"filename"`
+	Content  string `json:"content"`
+}

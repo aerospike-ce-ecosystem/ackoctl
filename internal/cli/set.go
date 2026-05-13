@@ -10,6 +10,9 @@ import (
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/output"
 )
 
+// Issue #5 — `ackoctl set truncate` parity with cluster-manager's MCP
+// truncate_set tool. Destructive: `--yes/-y` is mandatory.
+
 // cluster-manager does not expose a dedicated /sets endpoint. We derive the
 // set list from the cluster info response so the command stays robust
 // against schema evolution; only the {namespaces:[{name, sets:[{name,...}]}]}
@@ -27,7 +30,60 @@ func newSetCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "set",
 		Short: "Inspect Aerospike sets (derived from cluster info)",
 	}
-	cmd.AddCommand(newSetListCmd(global))
+	cmd.AddCommand(newSetListCmd(global), newSetTruncateCmd(global))
+	return cmd
+}
+
+func newSetTruncateCmd(global *GlobalFlags) *cobra.Command {
+	var (
+		namespace string
+		set       string
+		beforeLut int64
+		yes       bool
+	)
+	cmd := &cobra.Command{
+		Use:   "truncate CONN_ID",
+		Short: "Truncate every record in a set (optionally up to a last-update-time cutoff)",
+		Long: `Truncate every record in <namespace>.<set>.
+
+When --before-lut is omitted the entire set is wiped. When provided, only
+records whose last-update-time is below the given nanosecond cutoff (since
+the CITRUS epoch) are truncated. Server rejects --before-lut=0 outright to
+avoid the silent "lut=0 means truncate-all" footgun at the info-command
+layer; omit the flag for a full truncate.
+
+Destructive: requires --yes/-y to proceed.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				return fmt.Errorf("confirmation required (--yes)")
+			}
+			var lutPtr *int64
+			if cmd.Flags().Changed("before-lut") {
+				v := beforeLut
+				lutPtr = &v
+			}
+			c, err := newClient(cmd, global)
+			if err != nil {
+				return err
+			}
+			if err := c.TruncateSet(cmd.Context(), args[0], namespace, set, lutPtr); err != nil {
+				return err
+			}
+			if lutPtr != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Truncated %s/%s.%s up to lut=%d\n", args[0], namespace, set, *lutPtr)
+			} else {
+				fmt.Fprintf(cmd.ErrOrStderr(), "Truncated %s/%s.%s (full set)\n", args[0], namespace, set)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&namespace, "namespace", "", "namespace (required)")
+	cmd.Flags().StringVar(&set, "set", "", "set name (required)")
+	cmd.Flags().Int64Var(&beforeLut, "before-lut", 0, "truncate only records with last-update-time below this nanosecond cutoff; omit for a full set wipe")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive truncate")
+	_ = cmd.MarkFlagRequired("namespace")
+	_ = cmd.MarkFlagRequired("set")
 	return cmd
 }
 

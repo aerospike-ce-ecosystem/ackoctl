@@ -270,6 +270,19 @@ type SecondaryIndex struct {
 	State     string `json:"state"`
 }
 
+// TruncateSetRequest mirrors cluster-manager's TruncateSetRequest body for
+// ``POST /sets/{conn_id}/{namespace}/{set_name}/truncate``. ``BeforeLut`` is
+// the optional cutoff in nanoseconds since CITRUS epoch (aerospike-py's
+// ``truncate`` ``nanos`` parameter) — only records with last-update-time
+// below this threshold get truncated. A pointer is used so the client can
+// emit a literal ``null`` (or omit the key) when the caller wants a full
+// truncate, distinct from sending ``"beforeLut": 0`` which the server
+// rejects as ambiguous (lut=0 means "no cutoff" at the info-command level
+// and would silently turn a buggy zero into a full wipe).
+type TruncateSetRequest struct {
+	BeforeLut *int64 `json:"beforeLut,omitempty"`
+}
+
 // CreateIndexRequest mirrors CreateIndexRequest.
 type CreateIndexRequest struct {
 	Namespace string `json:"namespace"`

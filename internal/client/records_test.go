@@ -103,6 +103,49 @@ func TestDeleteRecordSendsQueryParams(t *testing.T) {
 	require.NoError(t, c.DeleteRecord(context.Background(), "conn-1", "test", "users", "alice", ""))
 }
 
+func TestDeleteBinHitsPathSegmentsAndPKType(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		// Path segments are escaped; the test server decodes %2F-free segments
+		// back to their literal form when populating URL.Path.
+		assert.Equal(t, "/v1/records/conn-1/test/users/alice/bins/age", r.URL.Path)
+		assert.Equal(t, "string", r.URL.Query().Get("pk_type"))
+		w.WriteHeader(http.StatusNoContent)
+	})
+	require.NoError(t, c.DeleteBin(context.Background(), "conn-1", "test", "users", "alice", "age", "string"))
+}
+
+func TestDeleteBinOmitsEmptyPKType(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.URL.RawQuery, "pk_type must not be sent when empty so server applies its `auto` default")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	require.NoError(t, c.DeleteBin(context.Background(), "conn-1", "test", "users", "alice", "age", ""))
+}
+
+func TestDeleteBinRequiresAllPathParts(t *testing.T) {
+	c, _ := newTestClient(t, func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when required parts are missing")
+	})
+	require.Error(t, c.DeleteBin(context.Background(), "conn-1", "", "users", "alice", "age", ""))
+	require.Error(t, c.DeleteBin(context.Background(), "conn-1", "test", "", "alice", "age", ""))
+	require.Error(t, c.DeleteBin(context.Background(), "conn-1", "test", "users", "", "age", ""))
+	require.Error(t, c.DeleteBin(context.Background(), "conn-1", "test", "users", "alice", "", ""))
+}
+
+func TestDeleteBinSurfacesNotFound(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Record not found"}`))
+	})
+	err := c.DeleteBin(context.Background(), "conn-1", "test", "users", "ghost", "age", "")
+	require.Error(t, err)
+	var apiErr *APIError
+	require.True(t, errors.As(err, &apiErr))
+	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
+}
+
 func TestFilterRecordsPostsBodyAndDecodes(t *testing.T) {
 	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/records/conn-1/filter", r.URL.Path)

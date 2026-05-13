@@ -63,14 +63,18 @@ func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
 Namespaces cannot be created at runtime — they must be defined in aerospike.conf.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			req := client.ConfigureNamespaceRequest{"namespace": nsName}
+			// The cluster-manager body schema names the namespace field `name`
+			// (see CreateNamespaceRequest in api/models/cluster.py). The
+			// previous build sent `namespace`, which the server rejected with
+			// HTTP 422 ({"loc":["body","name"],"msg":"Field required"}).
+			req := client.ConfigureNamespaceRequest{"name": nsName}
 			for _, p := range params {
 				k, v, ok := strings.Cut(p, "=")
 				if !ok {
 					return fmt.Errorf("invalid --param %q (expected key=value)", p)
 				}
-				if k == "namespace" {
-					return fmt.Errorf("--param namespace=... is reserved; use --name to set the namespace")
+				if k == "name" {
+					return fmt.Errorf("--param name=... is reserved; use --name to set the namespace")
 				}
 				req[k] = v
 			}

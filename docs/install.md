@@ -1,8 +1,39 @@
 # Installing ackoctl
 
-The recommended path is the curl one-liner — it works the same on macOS and Linux (Ubuntu/Debian/RHEL/Alpine) for both `amd64` and `arm64`.
+Pick whichever channel matches your OS — they all install the same binary, just signed/verified differently.
 
-## One-liner (macOS + Linux)
+## Homebrew (macOS, Linux)
+
+```bash
+brew install aerospike-ce-ecosystem/tap/ackoctl
+```
+
+Homebrew handles updates: `brew upgrade ackoctl`. The formula lives in [aerospike-ce-ecosystem/homebrew-tap](https://github.com/aerospike-ce-ecosystem/homebrew-tap) and is bumped automatically on every release.
+
+## APT (Debian, Ubuntu)
+
+```bash
+sudo install -d /etc/apt/keyrings
+curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/key.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/ackoctl.gpg
+echo "deb [signed-by=/etc/apt/keyrings/ackoctl.gpg] https://aerospike-ce-ecosystem.github.io/ackoctl/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/ackoctl.list
+sudo apt update && sudo apt install ackoctl
+```
+
+Updates: `sudo apt update && sudo apt upgrade ackoctl`.
+
+## YUM / DNF (RHEL, Fedora, Rocky, AlmaLinux)
+
+```bash
+sudo curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/yum/ackoctl.repo \
+  -o /etc/yum.repos.d/ackoctl.repo
+sudo dnf install ackoctl
+```
+
+Both the repository metadata and each individual `.rpm` are GPG-signed; `dnf` enforces this when `gpgcheck=1` / `repo_gpgcheck=1` (the `.repo` file shipped above sets both).
+
+## Shell one-liner (any POSIX shell)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh

@@ -31,6 +31,53 @@ archives:
       - README.md
       - install.sh
 
+nfpms:
+  - id: ackoctl
+    package_name: ackoctl
+    file_name_template: >-
+      {{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    ids: [ackoctl]
+    vendor: aerospike-ce-ecosystem
+    homepage: https://github.com/aerospike-ce-ecosystem/ackoctl
+    maintainer: aerospike-ce-ecosystem <noreply@github.com>
+    description: |
+      CLI for aerospike-cluster-manager — manage Aerospike CE clusters
+      on Kubernetes via the cluster-manager REST API.
+    license: Apache-2.0
+    formats: [deb, rpm, apk]
+    bindir: /usr/bin
+    section: utils
+    priority: optional
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/ackoctl/LICENSE
+      - src: README.md
+        dst: /usr/share/doc/ackoctl/README.md
+    rpm:
+      group: Applications/System
+
+brews:
+  - name: ackoctl
+    ids: [ackoctl]
+    repository:
+      owner: aerospike-ce-ecosystem
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.GH_AW_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "chore(formula): bump {{ .ProjectName }} to {{ .Tag }}"
+    directory: Formula
+    homepage: https://github.com/aerospike-ce-ecosystem/ackoctl
+    description: CLI for aerospike-cluster-manager
+    license: Apache-2.0
+    skip_upload: auto
+    install: |
+      bin.install "ackoctl"
+    test: |
+      system "#{bin}/ackoctl", "version"
+
 checksum:
   name_template: 'checksums.txt'
 

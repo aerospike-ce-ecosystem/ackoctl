@@ -67,6 +67,27 @@ func (c *BaseClient) DeleteRecord(ctx context.Context, connID, namespace, set, p
 	return c.Do(ctx, http.MethodDelete, "/records/"+url.PathEscape(connID), nil, q, nil)
 }
 
+// DeleteBin removes a single bin from a record. The endpoint is idempotent on
+// the bin name — deleting a missing bin still returns 204. Removing the last
+// bin from a record causes the entire record to disappear server-side; this
+// matches standard Aerospike semantics and the cluster-manager docstring.
+// ``pkType`` defaults to ``auto`` on the server when empty.
+func (c *BaseClient) DeleteBin(ctx context.Context, connID, namespace, set, pk, binName, pkType string) error {
+	if namespace == "" || set == "" || pk == "" || binName == "" {
+		return fmt.Errorf("namespace, set, pk, and bin are all required for record delete-bin")
+	}
+	q := url.Values{}
+	if pkType != "" {
+		q.Set("pk_type", pkType)
+	}
+	path := "/records/" + url.PathEscape(connID) +
+		"/" + url.PathEscape(namespace) +
+		"/" + url.PathEscape(set) +
+		"/" + url.PathEscape(pk) +
+		"/bins/" + url.PathEscape(binName)
+	return c.Do(ctx, http.MethodDelete, path, nil, q, nil)
+}
+
 func (c *BaseClient) FilterRecords(ctx context.Context, connID string, req FilteredQueryRequest) (*FilteredQueryResponse, error) {
 	var out FilteredQueryResponse
 	if err := c.Do(ctx, http.MethodPost, "/records/"+url.PathEscape(connID)+"/filter", req, nil, &out); err != nil {

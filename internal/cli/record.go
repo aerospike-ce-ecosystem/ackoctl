@@ -21,6 +21,7 @@ func newRecordCmd(global *GlobalFlags) *cobra.Command {
 		newRecordGetCmd(global),
 		newRecordPutCmd(global),
 		newRecordDeleteCmd(global),
+		newRecordDeleteBinCmd(global),
 		newRecordQueryCmd(global),
 	)
 	return cmd
@@ -191,6 +192,46 @@ func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
+	return cmd
+}
+
+func newRecordDeleteBinCmd(global *GlobalFlags) *cobra.Command {
+	var (
+		namespace, set, pk, binName, pkType string
+		yes                                 bool
+	)
+	cmd := &cobra.Command{
+		Use:   "delete-bin CONN_ID",
+		Short: "Delete a single bin from a record (removes whole record if last bin)",
+		Long: `Remove one bin from a record. The cluster-manager endpoint is idempotent
+on the bin name. Note: removing the last bin from a record causes the entire
+record to disappear server-side — this is standard Aerospike behaviour.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !yes {
+				return fmt.Errorf("confirmation required (--yes)")
+			}
+			c, err := newClient(cmd, global)
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteBin(cmd.Context(), args[0], namespace, set, pk, binName, pkType); err != nil {
+				return err
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "Deleted bin %q from %s.%s pk=%s\n", binName, namespace, set, pk)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&namespace, "namespace", "", "namespace (required)")
+	cmd.Flags().StringVar(&set, "set", "", "set (required)")
+	cmd.Flags().StringVar(&pk, "pk", "", "primary key (required)")
+	cmd.Flags().StringVar(&binName, "bin", "", "bin name to delete (required)")
+	cmd.Flags().StringVar(&pkType, "pk-type", "", "particle type for pk: auto|string|int|bytes (default auto)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
+	_ = cmd.MarkFlagRequired("namespace")
+	_ = cmd.MarkFlagRequired("set")
+	_ = cmd.MarkFlagRequired("pk")
+	_ = cmd.MarkFlagRequired("bin")
 	return cmd
 }
 

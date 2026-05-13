@@ -99,37 +99,38 @@ func TestCreateConnectionFillsDefaultWorkspace(t *testing.T) {
 	assert.Equal(t, "ws-1", bodyJSON["workspaceId"], "client should inject context workspace if request omits it")
 }
 
-func TestCreateConnectionSerializesDescription(t *testing.T) {
+func TestCreateConnectionSerializesNote(t *testing.T) {
 	var bodyJSON map[string]any
 	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&bodyJSON)
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"new","name":"n","hosts":["h"],"port":3000,"description":"hello"}`))
+		_, _ = w.Write([]byte(`{"id":"new","name":"n","hosts":["h"],"port":3000,"note":"hello"}`))
 	})
 	conn, err := c.CreateConnection(context.Background(), CreateConnectionRequest{
-		Name: "n", Hosts: []string{"h"}, Port: 3000, Description: "hello",
+		Name: "n", Hosts: []string{"h"}, Port: 3000, Note: "hello",
 	})
 	require.NoError(t, err)
-	// Outgoing request uses the cluster-manager wire field name.
-	assert.Equal(t, "hello", bodyJSON["description"])
-	assert.NotContains(t, bodyJSON, "note", "must not send legacy `note` field")
-	// Response decode populates Description from the same wire field.
-	assert.Equal(t, "hello", conn.Description)
+	// cluster-manager renamed `description` -> `note` in v0.22.0
+	// (commit 9f5ec98, PR aerospike-cluster-manager#318). The wire field
+	// is `note`; we must never send the legacy `description` key.
+	assert.Equal(t, "hello", bodyJSON["note"])
+	assert.NotContains(t, bodyJSON, "description", "must not send legacy `description` field")
+	assert.Equal(t, "hello", conn.Note)
 }
 
-func TestUpdateConnectionSerializesDescription(t *testing.T) {
+func TestUpdateConnectionSerializesNote(t *testing.T) {
 	var bodyJSON map[string]any
 	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&bodyJSON)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"id":"abc","name":"n","hosts":["h"],"port":3000,"description":"updated"}`))
+		_, _ = w.Write([]byte(`{"id":"abc","name":"n","hosts":["h"],"port":3000,"note":"updated"}`))
 	})
-	desc := "updated"
-	conn, err := c.UpdateConnection(context.Background(), "abc", UpdateConnectionRequest{Description: &desc})
+	note := "updated"
+	conn, err := c.UpdateConnection(context.Background(), "abc", UpdateConnectionRequest{Note: &note})
 	require.NoError(t, err)
-	assert.Equal(t, "updated", bodyJSON["description"])
-	assert.NotContains(t, bodyJSON, "note")
-	assert.Equal(t, "updated", conn.Description)
+	assert.Equal(t, "updated", bodyJSON["note"])
+	assert.NotContains(t, bodyJSON, "description")
+	assert.Equal(t, "updated", conn.Note)
 }
 
 func TestConnectionHealthDecodesStatus(t *testing.T) {

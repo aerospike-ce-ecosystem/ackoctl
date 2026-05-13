@@ -11,7 +11,7 @@ type Connection struct {
 	ClusterName string            `json:"clusterName,omitempty"`
 	Username    string            `json:"username,omitempty"`
 	Color       string            `json:"color,omitempty"`
-	Description string            `json:"description,omitempty"`
+	Note        string            `json:"note,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	WorkspaceID string            `json:"workspaceId,omitempty"`
 	CreatedAt   string            `json:"createdAt,omitempty"`
@@ -28,7 +28,7 @@ type CreateConnectionRequest struct {
 	Username    string            `json:"username,omitempty"`
 	Password    string            `json:"password,omitempty"`
 	Color       string            `json:"color,omitempty"`
-	Description string            `json:"description,omitempty"`
+	Note        string            `json:"note,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	WorkspaceID string            `json:"workspaceId,omitempty"`
 }
@@ -43,7 +43,7 @@ type UpdateConnectionRequest struct {
 	Username    *string           `json:"username,omitempty"`
 	Password    *string           `json:"password,omitempty"`
 	Color       *string           `json:"color,omitempty"`
-	Description *string           `json:"description,omitempty"`
+	Note        *string           `json:"note,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 	WorkspaceID *string           `json:"workspaceId,omitempty"`
 }

@@ -31,3 +31,16 @@ func (c *BaseClient) ForceReconcileK8sCluster(ctx context.Context, namespace, na
 	}
 	return out, nil
 }
+
+// ScaleK8sCluster patches spec.size on the AerospikeCluster CR via
+// POST /k8s/clusters/{ns}/{name}/scale. The server validates the CE cap
+// (1..8); we mirror the same bound on the CLI side for fast feedback.
+func (c *BaseClient) ScaleK8sCluster(ctx context.Context, namespace, name string, size int) (K8sCluster, error) {
+	out := K8sCluster{}
+	path := "/k8s/clusters/" + url.PathEscape(namespace) + "/" + url.PathEscape(name) + "/scale"
+	body := map[string]int{"size": size}
+	if err := c.Do(ctx, http.MethodPost, path, body, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

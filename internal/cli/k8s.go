@@ -35,6 +35,7 @@ func newK8sClusterCmd(global *GlobalFlags) *cobra.Command {
 		newK8sClusterListCmd(global),
 		newK8sClusterGetCmd(global),
 		newK8sClusterReconcileCmd(global),
+		newK8sClusterScaleCmd(global),
 	)
 	return cmd
 }
@@ -135,6 +136,59 @@ Useful when the cluster is stuck in a drifted state.`,
 			return output.Print(cmd.OutOrStdout(), format, out)
 		},
 	}
+}
+
+func newK8sClusterScaleCmd(global *GlobalFlags) *cobra.Command {
+	var size int
+	cmd := &cobra.Command{
+		Use:   "scale NAMESPACE/NAME --size N",
+		Short: "Scale an ACKO-managed cluster to N nodes",
+		Long: `Patches spec.size on the AerospikeCluster CR via
+POST /k8s/clusters/{ns}/{name}/scale. CE caps the cluster at 8 nodes; both
+the CLI and the server reject sizes outside 1..8.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if size < 1 || size > 8 {
+				return fmt.Errorf("--size must be between 1 and 8 (CE cap)")
+			}
+			ns, name, err := splitNamespacedName(args[0])
+			if err != nil {
+				return err
+			}
+			c, err := newClient(cmd, global)
+			if err != nil {
+				return err
+			}
+			out, err := c.ScaleK8sCluster(cmd.Context(), ns, name, size)
+			if err != nil {
+				return err
+			}
+			format, err := global.Format()
+			if err != nil {
+				return err
+			}
+			return output.Print(cmd.OutOrStdout(), format, out,
+				output.WithTable(
+					[]string{"NAMESPACE", "NAME", "PHASE", "SIZE"},
+					func(v any) []string {
+						row := v.(client.K8sCluster)
+						return []string{
+							stringField(row, "namespace"),
+							stringField(row, "name"),
+							stringField(row, "phase"),
+							stringField(row, "size"),
+						}
+					},
+					func(any) []any {
+						return []any{out}
+					},
+				),
+			)
+		},
+	}
+	cmd.Flags().IntVar(&size, "size", 0, "target node count (1..8, CE cap)")
+	_ = cmd.MarkFlagRequired("size")
+	return cmd
 }
 
 func splitNamespacedName(s string) (string, string, error) {

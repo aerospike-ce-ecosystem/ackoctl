@@ -19,6 +19,7 @@ type GlobalFlags struct {
 	OutputFormat            string
 	Verbose                 bool
 	InsecureSkipTLS         bool
+	NoVersionCheck          bool
 	ContextExplicit         bool
 	WorkspaceExplicit       bool
 	InsecureSkipTLSExplicit bool
@@ -47,6 +48,7 @@ go through cluster-manager's /api/* surface.`,
 			flags.ContextExplicit = f.Changed("context")
 			flags.WorkspaceExplicit = f.Changed("workspace")
 			flags.InsecureSkipTLSExplicit = f.Changed("insecure-skip-tls")
+			runVersionCheck(c, flags.NoVersionCheck)
 			return nil
 		},
 	}
@@ -59,9 +61,11 @@ go through cluster-manager's /api/* surface.`,
 	cmd.PersistentFlags().StringVarP(&flags.OutputFormat, "output", "o", "table", "output format: table|json|yaml")
 	cmd.PersistentFlags().BoolVarP(&flags.Verbose, "verbose", "v", false, "verbose logging to stderr")
 	cmd.PersistentFlags().BoolVar(&flags.InsecureSkipTLS, "insecure-skip-tls", false, "skip TLS certificate verification (dev only)")
+	cmd.PersistentFlags().BoolVar(&flags.NoVersionCheck, "no-version-check", false, "disable the once-a-day check for a newer ackoctl release (also: ACKOCTL_NO_VERSION_CHECK=1)")
 
 	cmd.AddCommand(
 		newVersionCmd(),
+		newUpgradeCmd(),
 		newConfigCmd(flags),
 		newConnectionCmd(flags),
 		newClusterCmd(flags),

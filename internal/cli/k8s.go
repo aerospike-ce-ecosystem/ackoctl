@@ -41,6 +41,7 @@ func newK8sClusterCmd(global *GlobalFlags) *cobra.Command {
 		newK8sClusterScaleCmd(global),
 		newK8sClusterEventsCmd(global),
 		newK8sClusterLogsCmd(global),
+		newK8sClusterPodsCmd(global),
 	)
 	return cmd
 }
@@ -416,6 +417,76 @@ func sinceFlagToSeconds(d time.Duration) (int, error) {
 		return 0, fmt.Errorf("--since must resolve to between 1s and 24h, got %s", d)
 	}
 	return secs, nil
+}
+
+// newK8sClusterPodsCmd wires `ackoctl k8s cluster pods NAMESPACE/NAME`. Default
+// table output keeps the columns operators reach for first when triaging a
+// cluster (phase/ready/podIP/nodeId/rackId/image); -o json|yaml emits the full
+// K8sPodStatus envelope including configHash/podSpecHash/accessEndpoints so
+// upgrade-tracking scripts and dashboards can consume the entire shape.
+func newK8sClusterPodsCmd(global *GlobalFlags) *cobra.Command {
+	return &cobra.Command{
+		Use:   "pods NAMESPACE/NAME",
+		Short: "List pod status for an ACKO-managed cluster",
+		Long: `Fetches per-pod status for the AerospikeCluster CR via
+GET /k8s/clusters/{ns}/{name}/pods. The table view shows the columns
+most useful during triage; -o json or -o yaml emits the full payload
+(configHash, podSpecHash, accessEndpoints, etc.).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ns, name, err := splitNamespacedName(args[0])
+			if err != nil {
+				return err
+			}
+			c, err := newClient(cmd, global)
+			if err != nil {
+				return err
+			}
+			pods, err := c.ListK8sPods(cmd.Context(), ns, name)
+			if err != nil {
+				return err
+			}
+			format, err := global.Format()
+			if err != nil {
+				return err
+			}
+			return output.Print(cmd.OutOrStdout(), format, pods,
+				output.WithTable(
+					[]string{"NAME", "PHASE", "READY", "POD_IP", "NODE_ID", "RACK_ID", "IMAGE"},
+					func(v any) []string {
+						p := v.(client.K8sPodStatus)
+						return []string{
+							p.Name,
+							p.Phase,
+							strconv.FormatBool(p.IsReady),
+							p.PodIP,
+							p.NodeID,
+							rackIDField(p.RackID),
+							p.Image,
+						}
+					},
+					func(any) []any {
+						rows := make([]any, 0, len(pods))
+						for _, p := range pods {
+							rows = append(rows, p)
+						}
+						return rows
+					},
+				),
+			)
+		},
+	}
+}
+
+// rackIDField renders an optional rack id for the table view. Nil prints as
+// empty so the column does not flap between "0" (meaning rack 0) and "no rack
+// id reported"; CE's rack-aware feature uses 1-indexed rack ids in practice
+// but the wire field is technically nullable, so we preserve that distinction.
+func rackIDField(rid *int) string {
+	if rid == nil {
+		return ""
+	}
+	return strconv.Itoa(*rid)
 }
 
 func splitNamespacedName(s string) (string, string, error) {

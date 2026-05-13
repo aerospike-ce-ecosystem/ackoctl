@@ -46,6 +46,20 @@ func (c *BaseClient) ScaleK8sCluster(ctx context.Context, namespace, name string
 	return out, nil
 }
 
+// ListK8sPods fetches the per-pod status snapshot for an AerospikeCluster CR
+// via GET /k8s/clusters/{ns}/{name}/pods. The server returns a bare JSON
+// array of K8sPodStatus -- no envelope. Pods that have not yet reported
+// nodeId/rackId/configHash etc. surface those fields as omitted on the wire,
+// which round-trips through the optional struct fields.
+func (c *BaseClient) ListK8sPods(ctx context.Context, namespace, name string) ([]K8sPodStatus, error) {
+	var out []K8sPodStatus
+	path := "/k8s/clusters/" + url.PathEscape(namespace) + "/" + url.PathEscape(name) + "/pods"
+	if err := c.Do(ctx, http.MethodGet, path, nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ListK8sClusterEvents fetches Kubernetes events for an AerospikeCluster CR.
 // The server returns a bare JSON array (not an envelope), already filtered by
 // the involvedObject field selector and capped at limit. The optional

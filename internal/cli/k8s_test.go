@@ -128,6 +128,23 @@ func TestSinceFlagToSecondsRejectsOverMax(t *testing.T) {
 	assert.Contains(t, err.Error(), "between 1s and 24h")
 }
 
+func TestRackIDFieldNil(t *testing.T) {
+	// A pod that has not yet been assigned to a rack -- the wire field is
+	// omitted and the pointer surfaces as nil. Render as empty (not "0"
+	// or "<nil>") so the column doesn't look like "rack 0".
+	assert.Equal(t, "", rackIDField(nil))
+}
+
+func TestRackIDFieldZero(t *testing.T) {
+	zero := 0
+	assert.Equal(t, "0", rackIDField(&zero), "rack id 0 must render distinctly from nil")
+}
+
+func TestRackIDFieldPositive(t *testing.T) {
+	rid := 7
+	assert.Equal(t, "7", rackIDField(&rid))
+}
+
 func TestSinceFlagToSecondsAt24h(t *testing.T) {
 	got, err := sinceFlagToSeconds(24 * time.Hour)
 	require.NoError(t, err)

@@ -198,3 +198,38 @@ func TestUdfListTableOutput(t *testing.T) {
 	assert.Contains(t, out, "agg.lua")
 	assert.Contains(t, out, "deadbeef")
 }
+
+// Regression: the upload command renders a *UDFModule pointer through
+// output.Print's table path. A prior fix asserted the wrong type (`UDFModule`
+// instead of `*UDFModule`) which panicked at runtime — the existing upload
+// tests only exercised JSON output, missing the panic.
+func TestUdfUploadDefaultTableDoesNotPanic(t *testing.T) {
+	const source = "function hi() return 1 end\n"
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "hi.lua")
+	require.NoError(t, os.WriteFile(src, []byte(source), 0o600))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"filename":"hi.lua","type":"LUA","hash":"abc123"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	// Default output is table — this is the path that previously panicked.
+	root.SetArgs([]string{"udf", "upload", "conn-1", "--file", src})
+	root.SetContext(context.Background())
+	require.NoError(t, root.Execute())
+
+	out := stdout.String()
+	assert.Contains(t, out, "FILENAME")
+	assert.Contains(t, out, "hi.lua")
+	assert.Contains(t, out, "abc123")
+}

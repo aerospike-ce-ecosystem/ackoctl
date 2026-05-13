@@ -107,7 +107,10 @@ as the registered module name. cluster-manager validates the filename against
 				output.WithTable(
 					[]string{"FILENAME", "TYPE", "HASH"},
 					func(v any) []string {
-						m := v.(client.UDFModule)
+						// UploadUDF returns *UDFModule; the row callback gets
+						// the same value back from Print, so the assertion
+						// must match the pointer shape, not the bare struct.
+						m := v.(*client.UDFModule)
 						return []string{m.Filename, m.Type, m.Hash}
 					},
 					func(any) []any { return []any{module} },

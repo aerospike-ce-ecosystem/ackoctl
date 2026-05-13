@@ -103,7 +103,16 @@ as the registered module name. cluster-manager validates the filename against
 			if err != nil {
 				return err
 			}
-			return output.Print(cmd.OutOrStdout(), format, module)
+			return output.Print(cmd.OutOrStdout(), format, module,
+				output.WithTable(
+					[]string{"FILENAME", "TYPE", "HASH"},
+					func(v any) []string {
+						m := v.(client.UDFModule)
+						return []string{m.Filename, m.Type, m.Hash}
+					},
+					func(any) []any { return []any{module} },
+				),
+			)
 		},
 	}
 	cmd.Flags().StringVar(&filePath, "file", "", "path to a local .lua source file (required)")

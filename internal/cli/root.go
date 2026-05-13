@@ -72,6 +72,7 @@ go through cluster-manager's /api/* surface.`,
 		newIndexCmd(flags),
 		newNoteCmd(flags),
 		newUdfCmd(flags),
+		newAdminCmd(flags),
 	)
 	return cmd
 }

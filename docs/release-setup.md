@@ -199,6 +199,7 @@ If the signing key is ever compromised or expires:
 ## Troubleshooting
 
 - **`release` succeeds but no formula PR** → `GH_AW_GITHUB_TOKEN` is unset or lacks `Contents: write` on the tap. Goreleaser silently skips the brew step in that case.
+- **`release` succeeds but `publish-packages` did not fire** → `GH_AW_GITHUB_TOKEN` is unset or lacks `Actions: write` on this repo, so the explicit `gh workflow run publish-packages.yml` step at the end of `release.yml` could not dispatch. Re-run by hand from the Actions UI (`Run workflow` → enter the tag) until the secret is fixed.
 - **`publish-packages` fails at "Sign APT Release"** → the GPG key was imported but `GPG_PASSPHRASE` is wrong (or the key is passphrase-less and `GPG_PASSPHRASE` is set to garbage).
 - **`apt update` says "NO_PUBKEY"** → the user is on an old `key.gpg`; have them re-download it.
 - **`dnf` says "Signature verification failed"** → individual `.rpm` is unsigned. Probably an old release published before the rpmsign step was added; re-run `publish-packages` against that tag.

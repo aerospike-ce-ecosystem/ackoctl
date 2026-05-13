@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 func (c *BaseClient) ListK8sClusters(ctx context.Context) ([]K8sCluster, error) {
@@ -40,6 +41,26 @@ func (c *BaseClient) ScaleK8sCluster(ctx context.Context, namespace, name string
 	path := "/k8s/clusters/" + url.PathEscape(namespace) + "/" + url.PathEscape(name) + "/scale"
 	body := map[string]int{"size": size}
 	if err := c.Do(ctx, http.MethodPost, path, body, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListK8sClusterEvents fetches Kubernetes events for an AerospikeCluster CR.
+// The server returns a bare JSON array (not an envelope), already filtered by
+// the involvedObject field selector and capped at limit. The optional
+// category filter (e.g. "Scaling", "Lifecycle") is applied server-side.
+func (c *BaseClient) ListK8sClusterEvents(ctx context.Context, namespace, name string, limit int, category string) ([]K8sClusterEvent, error) {
+	q := url.Values{}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if category != "" {
+		q.Set("category", category)
+	}
+	var out []K8sClusterEvent
+	path := "/k8s/clusters/" + url.PathEscape(namespace) + "/" + url.PathEscape(name) + "/events"
+	if err := c.Do(ctx, http.MethodGet, path, nil, q, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

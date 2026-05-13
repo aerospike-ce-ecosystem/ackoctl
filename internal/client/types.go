@@ -85,6 +85,20 @@ type K8sClusterListResponse struct {
 	Items []K8sCluster `json:"items"`
 }
 
+// K8sClusterEvent mirrors cluster-manager's K8sClusterEvent. Captures the
+// fields ackoctl renders or filters on. Timestamps are RFC3339 strings as
+// produced by the Kubernetes API.
+type K8sClusterEvent struct {
+	Type           string `json:"type,omitempty"`
+	Reason         string `json:"reason,omitempty"`
+	Message        string `json:"message,omitempty"`
+	Count          int    `json:"count,omitempty"`
+	FirstTimestamp string `json:"firstTimestamp,omitempty"`
+	LastTimestamp  string `json:"lastTimestamp,omitempty"`
+	Source         string `json:"source,omitempty"`
+	Category       string `json:"category,omitempty"`
+}
+
 // ConfigureNamespaceRequest is a minimal contract — the cluster-manager
 // CreateNamespaceRequest body accepts a namespace name plus dynamic config
 // key/value pairs. We pass it through as a map to avoid drifting against the

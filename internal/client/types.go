@@ -215,3 +215,65 @@ type CreateIndexRequest struct {
 	Name      string `json:"name"`
 	Type      string `json:"type"`
 }
+
+// SetNote mirrors cluster-manager's SetNote — a free-text operator memo
+// attached to (connectionId, namespace, setName). Notes live in
+// cluster-manager's metaDB, not in Aerospike. ``updatedBy`` is the OIDC
+// ``sub`` of the most recent writer, or empty when running under bearer
+// token / anonymous auth.
+type SetNote struct {
+	ConnectionID string `json:"connectionId"`
+	Namespace    string `json:"namespace"`
+	SetName      string `json:"setName"`
+	Note         string `json:"note"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+	UpdatedBy    string `json:"updatedBy,omitempty"`
+}
+
+// RecordNote mirrors cluster-manager's RecordNote — adds the primary key
+// fields to SetNote. The persisted ``pkType`` is the resolved type
+// (``string|int|bytes``); ``auto`` is a request-time hint only.
+// ``digestHex`` is verification-only — derived from (set, pk), never used
+// as a join key.
+type RecordNote struct {
+	ConnectionID string `json:"connectionId"`
+	Namespace    string `json:"namespace"`
+	SetName      string `json:"setName"`
+	PKText       string `json:"pkText"`
+	PKType       string `json:"pkType"`
+	DigestHex    string `json:"digestHex,omitempty"`
+	Note         string `json:"note"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
+	UpdatedBy    string `json:"updatedBy,omitempty"`
+}
+
+// UpsertSetNoteRequest mirrors cluster-manager's UpsertSetNoteRequest body
+// for ``PUT /notes/sets/...``. The server rejects empty / whitespace-only
+// notes (``min_length=1``); use the DELETE endpoint to remove.
+type UpsertSetNoteRequest struct {
+	Note string `json:"note"`
+}
+
+// UpsertRecordNoteRequest mirrors cluster-manager's UpsertRecordNoteRequest
+// body for ``PUT /notes/records/...``. ``PKType`` defaults to ``auto`` on
+// the server when omitted; we pass it through verbatim. The wire key is the
+// canonical Pydantic alias ``pk_type`` so this keeps working if the server
+// disables ``populate_by_name`` (Pydantic v3 default).
+type UpsertRecordNoteRequest struct {
+	Note   string `json:"note"`
+	PKType string `json:"pk_type,omitempty"`
+}
+
+// SetNotesListResponse mirrors the {"notes": [...]} envelope returned by
+// ``GET /notes/sets/{conn_id}``.
+type SetNotesListResponse struct {
+	Notes []SetNote `json:"notes"`
+}
+
+// RecordNotesListResponse mirrors the {"notes": [...]} envelope returned by
+// ``GET /notes/records/{conn_id}``.
+type RecordNotesListResponse struct {
+	Notes []RecordNote `json:"notes"`
+}

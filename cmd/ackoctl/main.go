@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/cli"
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/client"
@@ -32,7 +33,14 @@ func run() int {
 	defer stop()
 
 	root := cli.NewRootCmd()
-	if err := root.ExecuteContext(ctx); err != nil {
+	err := root.ExecuteContext(ctx)
+
+	// Give the background version-check a short grace period to flush its
+	// cache so first-time users build up a cache after one quick command.
+	// Capped tightly so an offline run never feels slow.
+	cli.WaitForBackgroundChecks(200 * time.Millisecond)
+
+	if err != nil {
 		printError(err)
 		return 1
 	}

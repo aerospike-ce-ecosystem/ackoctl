@@ -1,39 +1,8 @@
 # Installing ackoctl
 
-Pick whichever channel matches your OS — they all install the same binary, just signed/verified differently.
+`ackoctl` ships as a single static binary. Two install channels are supported: the shell one-liner (Linux, macOS) and Homebrew (macOS). Both serve the same artifacts from the GitHub Releases page.
 
-## Homebrew (macOS, Linux)
-
-```bash
-brew install aerospike-ce-ecosystem/tap/ackoctl
-```
-
-Homebrew handles updates: `brew upgrade ackoctl`. The formula lives in [aerospike-ce-ecosystem/homebrew-tap](https://github.com/aerospike-ce-ecosystem/homebrew-tap) and is bumped automatically on every release.
-
-## APT (Debian, Ubuntu)
-
-```bash
-sudo install -d /etc/apt/keyrings
-curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/key.gpg \
-  | sudo gpg --dearmor -o /etc/apt/keyrings/ackoctl.gpg
-echo "deb [signed-by=/etc/apt/keyrings/ackoctl.gpg] https://aerospike-ce-ecosystem.github.io/ackoctl/apt stable main" \
-  | sudo tee /etc/apt/sources.list.d/ackoctl.list
-sudo apt update && sudo apt install ackoctl
-```
-
-Updates: `sudo apt update && sudo apt upgrade ackoctl`.
-
-## YUM / DNF (RHEL, Fedora, Rocky, AlmaLinux)
-
-```bash
-sudo curl -fsSL https://aerospike-ce-ecosystem.github.io/ackoctl/yum/ackoctl.repo \
-  -o /etc/yum.repos.d/ackoctl.repo
-sudo dnf install ackoctl
-```
-
-Both the repository metadata and each individual `.rpm` are GPG-signed; `dnf` enforces this when `gpgcheck=1` / `repo_gpgcheck=1` (the `.repo` file shipped above sets both).
-
-## Shell one-liner (any POSIX shell)
+## Shell one-liner (Linux, macOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
@@ -84,6 +53,14 @@ less install.sh
 sh install.sh
 ```
 
+## Homebrew (macOS)
+
+```bash
+brew install aerospike-ce-ecosystem/tap/ackoctl
+```
+
+Homebrew handles updates: `brew upgrade ackoctl`. The formula lives in [aerospike-ce-ecosystem/homebrew-tap](https://github.com/aerospike-ce-ecosystem/homebrew-tap) and is bumped automatically on every release.
+
 ## Manual install
 
 If you'd rather skip the script, pick the archive that matches your machine from the [Releases page](https://github.com/aerospike-ce-ecosystem/ackoctl/releases) and untar it yourself:
@@ -128,11 +105,15 @@ ackoctl config view          # safe on a fresh install — prints an empty confi
 
 ## Updating
 
-Re-run the one-liner; it always fetches the latest tag (or whatever `ACKOCTL_VERSION` you set).
-
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
+ackoctl upgrade              # in-place self-update; verifies sha256 before swap
+ackoctl upgrade --check      # report current vs latest, do not install
+ackoctl upgrade --version v0.1.0   # pin to a specific release
 ```
+
+`ackoctl` also prints a one-line warning to stderr when a newer release is available (checked once every 24h, results cached in `~/.ackoctl/.version-check.json`). Disable with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
+
+Homebrew users should use `brew upgrade ackoctl` instead so the formula stays in sync with the installed binary.
 
 ## Uninstalling
 

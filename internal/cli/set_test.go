@@ -2,11 +2,34 @@ package cli
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// runSetCmd wires the set command against an httptest server so the test can
+// observe the exact wire shape without depending on ~/.ackoctl/config.yaml.
+func runSetCmd(t *testing.T, srvURL string, args ...string) (string, string, error) {
+	t.Helper()
+	root := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srvURL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs(args)
+	root.SetContext(context.Background())
+	err := root.Execute()
+	return stdout.String(), stderr.String(), err
+}
 
 func TestExtractSetsAcrossNamespaces(t *testing.T) {
 	info := map[string]any{
@@ -101,4 +124,74 @@ func TestExtractSetsDriftWhenNamespacesNotAList(t *testing.T) {
 	assert.Empty(t, rows)
 	assert.True(t, drifted)
 	assert.True(t, strings.Contains(buf.String(), "namespaces` is not a list"), "expected warning, got %q", buf.String())
+}
+
+// --- set truncate -----------------------------------------------------------
+
+func TestSetTruncateRequiresYes(t *testing.T) {
+	// --yes is the safety gate; without it the server must never be reached.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unexpected server call without --yes")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runSetCmd(t, srv.URL,
+		"set", "truncate", "conn-1",
+		"--namespace", "test", "--set", "users",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--yes")
+}
+
+func TestSetTruncateFullWipeOmitsBeforeLut(t *testing.T) {
+	// Default invocation (no --before-lut) must NOT send the key. cluster-
+	// manager rejects an explicit 0; we rely on cobra's Changed() check to
+	// stay silent when the user didn't pass the flag.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v1/sets/conn-1/test/users/truncate", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		_, hasKey := body["beforeLut"]
+		assert.False(t, hasKey, "beforeLut must be absent for full-set truncate; got %#v", body)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(srv.Close)
+	_, stderr, err := runSetCmd(t, srv.URL,
+		"set", "truncate", "conn-1",
+		"--namespace", "test", "--set", "users", "--yes",
+	)
+	require.NoError(t, err)
+	assert.Contains(t, stderr, "full set")
+}
+
+func TestSetTruncateParsesBeforeLut(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		// JSON decodes integers into float64 inside an `any` slot.
+		assert.EqualValues(t, int64(1700000000000000000), body["beforeLut"])
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"truncated up to lut"}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, stderr, err := runSetCmd(t, srv.URL,
+		"set", "truncate", "conn-1",
+		"--namespace", "test", "--set", "users",
+		"--before-lut", "1700000000000000000",
+		"--yes",
+	)
+	require.NoError(t, err)
+	assert.Contains(t, stderr, "lut=1700000000000000000")
+}
+
+func TestSetTruncateRequiresNamespaceAndSet(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("unexpected server call with missing required flags")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runSetCmd(t, srv.URL,
+		"set", "truncate", "conn-1", "--namespace", "test", "--yes",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
 }

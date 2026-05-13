@@ -23,3 +23,11 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with write access to aerospike-ce-ecosystem/homebrew-tap.
+          # Required so goreleaser can push the bumped Formula/ackoctl.rb
+          # across repos — the default GITHUB_TOKEN cannot reach a sibling
+          # repository. If the secret is unset, brews.skip_upload=auto
+          # leaves the release intact and only the formula bump is skipped.
+          # Reuses the existing org-wide GH_AW_GITHUB_TOKEN secret rather
+          # than minting a HOMEBREW_TAP_GITHUB_TOKEN dedicated to this flow.
+          GH_AW_GITHUB_TOKEN: ${{ secrets.GH_AW_GITHUB_TOKEN }}

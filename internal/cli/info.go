@@ -55,22 +55,26 @@ forward any verb including write-capable ones such as set-config:.`,
 			if format == output.FormatJSON || format == output.FormatYAML {
 				return output.Print(cmd.OutOrStdout(), format, resp)
 			}
-			results := resp.Results
-			return output.Print(cmd.OutOrStdout(), format, results,
+			return output.Print(cmd.OutOrStdout(), format, resp.Results,
 				output.WithTable(
 					[]string{"NODE", "COMMAND", "OUTPUT", "ERROR"},
 					func(v any) []string {
 						r := v.(client.InfoCommandResult)
+						errStr := ""
+						if r.Error != nil {
+							errStr = *r.Error
+						}
 						return []string{
 							r.Node,
 							r.Command,
 							truncateNote(r.Output, infoOutputLimit),
-							r.Error,
+							errStr,
 						}
 					},
-					func(any) []any {
-						rows := make([]any, 0, len(results))
-						for _, r := range results {
+					func(v any) []any {
+						src := v.([]client.InfoCommandResult)
+						rows := make([]any, 0, len(src))
+						for _, r := range src {
 							rows = append(rows, r)
 						}
 						return rows

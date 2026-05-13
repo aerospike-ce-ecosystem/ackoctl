@@ -432,10 +432,15 @@ type CreateRoleRequest struct {
 // single node failed while peers succeeded (partial fan-out), so callers can
 // surface a row-level failure without losing the rest of the matrix.
 type InfoCommandResult struct {
-	Command string `json:"command"`
-	Node    string `json:"node"`
-	Output  string `json:"output"`
-	Error   string `json:"error,omitempty"`
+	Command string  `json:"command"`
+	Node    string  `json:"node"`
+	Output  string  `json:"output"`
+	// Error is a pointer so JSON round-trips preserve the distinction
+	// between "successful row" (server sends `"error": null`, we keep nil)
+	// and "row-level failure" (server sends a string). With omitempty the
+	// nil case omits the key entirely; downstream `jq '.results[].error'`
+	// pipelines that key on presence stay correct.
+	Error *string `json:"error,omitempty"`
 }
 
 // ExecuteInfoRequest mirrors cluster-manager's request body for

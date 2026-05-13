@@ -99,6 +99,27 @@ type K8sClusterEvent struct {
 	Category       string `json:"category,omitempty"`
 }
 
+// K8sLogsOptions carries the optional query parameters for
+// GetK8sPodLogs. Zero values mean "not set": Tail==0 uses the server default,
+// empty Container omits the param, SinceSeconds==0 omits the param.
+type K8sLogsOptions struct {
+	Container    string
+	Tail         int
+	SinceSeconds int
+}
+
+// K8sPodLogs mirrors the cluster-manager response envelope from
+// GET /k8s/clusters/{ns}/{name}/pods/{pod}/logs. Logs is the raw concatenated
+// log string; SinceSeconds is a pointer so callers can distinguish
+// "server omitted this field" (nil) from "server returned 0" (rare but
+// technically possible if the server ever lowers the floor).
+type K8sPodLogs struct {
+	Pod          string `json:"pod"`
+	Logs         string `json:"logs"`
+	TailLines    int    `json:"tailLines"`
+	SinceSeconds *int   `json:"sinceSeconds,omitempty"`
+}
+
 // ConfigureNamespaceRequest is a minimal contract — the cluster-manager
 // CreateNamespaceRequest body accepts a namespace name plus dynamic config
 // key/value pairs. We pass it through as a map to avoid drifting against the

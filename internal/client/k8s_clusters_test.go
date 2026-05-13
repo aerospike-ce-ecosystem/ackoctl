@@ -141,6 +141,113 @@ func TestGetK8sPodLogsOmitsOptionalQueryParams(t *testing.T) {
 	assert.Nil(t, out.SinceSeconds, "server-omitted sinceSeconds should round-trip as nil")
 }
 
+func TestListK8sPodsRoundTrip(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/v1/k8s/clusters/ns/c1/pods", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		// Mixed states: ready/Running, NotReady but Running, and a Pending
+		// pod that has not yet reported nodeId/rackId/hashes. The omitted
+		// fields exercise the optional pointer round-trip.
+		_, _ = w.Write([]byte(`[
+			{
+				"name":"c1-rack1-0",
+				"podIP":"10.0.0.1",
+				"hostIP":"172.16.0.5",
+				"isReady":true,
+				"phase":"Running",
+				"image":"aerospike/aerospike-server:8.1.0",
+				"dynamicConfigStatus":"Synced",
+				"nodeId":"BB9000000000001",
+				"rackId":1,
+				"configHash":"sha256:abc",
+				"podSpecHash":"sha256:def",
+				"accessEndpoints":["10.0.0.1:3000","aerospike.example.com:3000"],
+				"servicePort":3000,
+				"clusterPort":3002
+			},
+			{
+				"name":"c1-rack1-1",
+				"podIP":"10.0.0.2",
+				"hostIP":"172.16.0.6",
+				"isReady":false,
+				"phase":"Running",
+				"image":"aerospike/aerospike-server:8.1.0",
+				"dynamicConfigStatus":"Pending",
+				"nodeId":"BB9000000000002",
+				"rackId":1,
+				"configHash":"sha256:abc",
+				"podSpecHash":"sha256:old",
+				"accessEndpoints":["10.0.0.2:3000"],
+				"servicePort":3000,
+				"clusterPort":3002
+			},
+			{
+				"name":"c1-rack2-0",
+				"isReady":false,
+				"phase":"Pending",
+				"image":"aerospike/aerospike-server:8.1.0"
+			}
+		]`))
+	})
+
+	pods, err := c.ListK8sPods(context.Background(), "ns", "c1")
+	require.NoError(t, err)
+	require.Len(t, pods, 3)
+
+	// Ready pod: all fields populated; pointer fields should be non-nil.
+	assert.Equal(t, "c1-rack1-0", pods[0].Name)
+	assert.True(t, pods[0].IsReady)
+	assert.Equal(t, "Running", pods[0].Phase)
+	assert.Equal(t, "10.0.0.1", pods[0].PodIP)
+	assert.Equal(t, "172.16.0.5", pods[0].HostIP)
+	assert.Equal(t, "BB9000000000001", pods[0].NodeID)
+	require.NotNil(t, pods[0].RackID)
+	assert.Equal(t, 1, *pods[0].RackID)
+	assert.Equal(t, "sha256:abc", pods[0].ConfigHash)
+	assert.Equal(t, "sha256:def", pods[0].PodSpecHash)
+	assert.Equal(t, []string{"10.0.0.1:3000", "aerospike.example.com:3000"}, pods[0].AccessEndpoints)
+	require.NotNil(t, pods[0].ServicePort)
+	assert.Equal(t, 3000, *pods[0].ServicePort)
+	require.NotNil(t, pods[0].ClusterPort)
+	assert.Equal(t, 3002, *pods[0].ClusterPort)
+	assert.Equal(t, "Synced", pods[0].DynamicConfigStatus)
+
+	// Not-ready but still scheduled: configHash matches the cluster but
+	// podSpecHash is stale -- typical mid-rolling-restart state.
+	assert.Equal(t, "c1-rack1-1", pods[1].Name)
+	assert.False(t, pods[1].IsReady)
+	assert.Equal(t, "Pending", pods[1].DynamicConfigStatus)
+	assert.Equal(t, "sha256:old", pods[1].PodSpecHash)
+
+	// Pending pod: server omitted everything the kubelet had not reported
+	// yet. The optional pointer fields must surface as nil so callers can
+	// distinguish "not reported" from "zero".
+	assert.Equal(t, "c1-rack2-0", pods[2].Name)
+	assert.False(t, pods[2].IsReady)
+	assert.Equal(t, "Pending", pods[2].Phase)
+	assert.Empty(t, pods[2].PodIP)
+	assert.Empty(t, pods[2].HostIP)
+	assert.Empty(t, pods[2].NodeID)
+	assert.Nil(t, pods[2].RackID)
+	assert.Nil(t, pods[2].ServicePort)
+	assert.Nil(t, pods[2].ClusterPort)
+	assert.Nil(t, pods[2].AccessEndpoints)
+}
+
+func TestListK8sPodsSurfacesAPIError(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"AerospikeCluster ns/c1 not found"}`))
+	})
+	_, err := c.ListK8sPods(context.Background(), "ns", "c1")
+	require.Error(t, err)
+	var apiErr *APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusNotFound, apiErr.StatusCode)
+}
+
 func TestGetK8sPodLogsSurfacesNotFound(t *testing.T) {
 	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

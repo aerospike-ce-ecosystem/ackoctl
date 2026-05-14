@@ -45,10 +45,10 @@ func newConnectionListCmd(global *GlobalFlags) *cobra.Command {
 			}
 			return output.Print(cmd.OutOrStdout(), format, conns,
 				output.WithTable(
-					[]string{"ID", "NAME", "HOSTS", "PORT", "WORKSPACE"},
+					[]string{"ID", "NAME", "HOSTS", "PORT", "WORKSPACE", "NOTE"},
 					func(v any) []string {
 						c := v.(client.Connection)
-						return []string{c.ID, c.Name, strings.Join(c.Hosts, ","), fmt.Sprint(c.Port), c.WorkspaceID}
+						return []string{c.ID, c.Name, strings.Join(c.Hosts, ","), fmt.Sprint(c.Port), c.WorkspaceID, truncateNote(c.Note, noteDisplayLimit)}
 					},
 					func(any) []any {
 						rows := make([]any, 0, len(conns))

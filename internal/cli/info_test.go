@@ -14,7 +14,7 @@ import (
 
 // runInfoCmd mirrors runNoteCmd: wires the root command against an httptest
 // server, isolates HOME so the config loader can't leak, and forces JSON
-// output unless the caller passes their own ``--output``.
+// output unless the caller passes their own “--output“.
 func runInfoCmd(t *testing.T, srvURL string, args ...string) (string, string, error) {
 	t.Helper()
 	root := NewRootCmd()

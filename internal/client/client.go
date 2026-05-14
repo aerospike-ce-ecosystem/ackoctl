@@ -33,10 +33,10 @@ type BaseClient struct {
 
 type Option func(*BaseClient)
 
-func WithHTTPClient(h *http.Client) Option         { return func(c *BaseClient) { c.HTTPClient = h } }
-func WithWorkspace(w string) Option                { return func(c *BaseClient) { c.Workspace = w } }
-func WithToken(t string) Option                    { return func(c *BaseClient) { c.Token = t } }
-func WithVerboseLogger(w io.Writer) Option         { return func(c *BaseClient) { c.VerboseLogger = w } }
+func WithHTTPClient(h *http.Client) Option { return func(c *BaseClient) { c.HTTPClient = h } }
+func WithWorkspace(w string) Option        { return func(c *BaseClient) { c.Workspace = w } }
+func WithToken(t string) Option            { return func(c *BaseClient) { c.Token = t } }
+func WithVerboseLogger(w io.Writer) Option { return func(c *BaseClient) { c.VerboseLogger = w } }
 
 func New(ctx config.Context, opts ...Option) *BaseClient {
 	transport := &http.Transport{}

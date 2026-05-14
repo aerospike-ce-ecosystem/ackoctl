@@ -8,7 +8,7 @@ import (
 )
 
 // infoOutputLimit caps the per-row "OUTPUT" column width in the default
-// table view. asinfo verbs like ``statistics`` or ``namespace/test`` return
+// table view. asinfo verbs like “statistics“ or “namespace/test“ return
 // hundreds of semicolon-delimited stats that obliterate a terminal; the JSON
 // and YAML formats preserve the full payload.
 const infoOutputLimit = 80

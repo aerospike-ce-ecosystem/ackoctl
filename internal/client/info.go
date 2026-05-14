@@ -7,11 +7,11 @@ import (
 	"net/url"
 )
 
-// ExecuteInfo posts an asinfo passthrough request to cluster-manager. ``req``
-// must specify at least one command; when ``req.Node`` is empty the server
-// fans out across every reachable node. When ``req.ReadOnly`` is true the
+// ExecuteInfo posts an asinfo passthrough request to cluster-manager. “req“
+// must specify at least one command; when “req.Node“ is empty the server
+// fans out across every reachable node. When “req.ReadOnly“ is true the
 // server enforces its asinfo verb whitelist and rejects unknown verbs with
-// 400 (surfaced as ``*APIError``); pass ``false`` to bypass the whitelist
+// 400 (surfaced as “*APIError“); pass “false“ to bypass the whitelist
 // (and accept any write-capable verb).
 func (c *BaseClient) ExecuteInfo(ctx context.Context, connID string, req ExecuteInfoRequest) (*ExecuteInfoResponse, error) {
 	if connID == "" {

@@ -290,7 +290,7 @@ scan does not surface — it returns every annotated record key for the slice.`,
 	return cmd
 }
 
-// truncateNote shortens a note body to ``limit`` runes (not bytes) and
+// truncateNote shortens a note body to “limit“ runes (not bytes) and
 // appends an ellipsis when truncation occurs. Operating on runes keeps
 // multibyte UTF-8 (e.g. Korean) from getting sliced mid-codepoint.
 func truncateNote(s string, limit int) string {

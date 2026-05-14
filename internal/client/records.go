@@ -71,7 +71,7 @@ func (c *BaseClient) DeleteRecord(ctx context.Context, connID, namespace, set, p
 // the bin name — deleting a missing bin still returns 204. Removing the last
 // bin from a record causes the entire record to disappear server-side; this
 // matches standard Aerospike semantics and the cluster-manager docstring.
-// ``pkType`` defaults to ``auto`` on the server when empty.
+// “pkType“ defaults to “auto“ on the server when empty.
 func (c *BaseClient) DeleteBin(ctx context.Context, connID, namespace, set, pk, binName, pkType string) error {
 	if namespace == "" || set == "" || pk == "" || binName == "" {
 		return fmt.Errorf("namespace, set, pk, and bin are all required for record delete-bin")

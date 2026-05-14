@@ -13,7 +13,7 @@ import (
 )
 
 // newAdminCmd groups Aerospike security-mode administration: user and role
-// management against the cluster-manager ``/admin/{conn_id}/*`` surface.
+// management against the cluster-manager “/admin/{conn_id}/*“ surface.
 // CE has no security module, so calls against a CE target return a 5xx with
 // "security not enabled" — the CLI surfaces that verbatim. The command ships
 // because the same workspace can target Enterprise clusters.
@@ -274,11 +274,11 @@ func newAdminRoleListCmd(global *GlobalFlags) *cobra.Command {
 
 func newAdminRoleCreateCmd(global *GlobalFlags) *cobra.Command {
 	var (
-		name              string
-		privilegeSpecs    []string
-		whitelist         []string
-		readQuota         int
-		writeQuota        int
+		name           string
+		privilegeSpecs []string
+		whitelist      []string
+		readQuota      int
+		writeQuota     int
 	)
 	cmd := &cobra.Command{
 		Use:   "create CONN_ID",
@@ -365,11 +365,11 @@ func newAdminRoleDeleteCmd(global *GlobalFlags) *cobra.Command {
 // helpers
 // ---------------------------------------------------------------------------
 
-// parsePrivileges turns CLI ``--privilege`` strings into the wire shape.
+// parsePrivileges turns CLI “--privilege“ strings into the wire shape.
 // Accepted forms:
-//   - ``CODE``                  → {code: CODE}
-//   - ``CODE:NAMESPACE``        → {code: CODE, namespace: NAMESPACE}
-//   - ``CODE:NAMESPACE/SET``    → {code: CODE, namespace: NAMESPACE, set: SET}
+//   - “CODE“                  → {code: CODE}
+//   - “CODE:NAMESPACE“        → {code: CODE, namespace: NAMESPACE}
+//   - “CODE:NAMESPACE/SET“    → {code: CODE, namespace: NAMESPACE, set: SET}
 //
 // Empty CODE is rejected; whitespace is trimmed from each segment. Server-side
 // validation is the authority on whether a CODE is a real privilege —
@@ -415,7 +415,7 @@ func parsePrivileges(specs []string) ([]client.RolePrivilege, error) {
 
 // formatPrivileges renders the wire shape back to the CLI input format for
 // table output, so users can copy a role's privilege list verbatim into a
-// subsequent ``--privilege`` flag.
+// subsequent “--privilege“ flag.
 func formatPrivileges(privs []client.RolePrivilege) string {
 	parts := make([]string, 0, len(privs))
 	for _, p := range privs {
@@ -433,7 +433,7 @@ func formatPrivileges(privs []client.RolePrivilege) string {
 
 // resolvePassword merges --password and --password-stdin. Exactly one of the
 // two must be supplied; combining both is a user error. The stdin path reads
-// a single line (trailing newline stripped) so ``echo "pw" | ackoctl ...``
+// a single line (trailing newline stripped) so “echo "pw" | ackoctl ...“
 // works as kubectl users expect.
 func resolvePassword(stdin io.Reader, password string, passwordStdin bool) (string, error) {
 	if password != "" && passwordStdin {

@@ -106,4 +106,3 @@ func shouldSkipVersionCheck(cmd *cobra.Command) bool {
 	}
 	return false
 }
-

@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
+- **`connection list` table now shows a `NOTE` column.** The connection profile's `note` was already returned by the API and visible in `-o json` / `-o yaml`, but the default table omitted it. Long bodies are truncated to 60 runes with an ellipsis (full text preserved in JSON/YAML).
 - **Linux install path simplified.** The shell one-liner (`curl … install.sh | sh`) is now the only documented channel on Linux. The signed APT / YUM repositories on `gh-pages` are retired — `install.sh` already covers OS/arch detection, sha256 verification, and `~/.local/bin` fallback. Homebrew remains the macOS channel.
 - **Goreleaser** — dropped the `nfpms` block; releases no longer ship `.deb` / `.rpm` / `.apk` artifacts. Only per-OS/arch `tar.gz` + `checksums.txt` + `install.sh` are uploaded.
 - **Workflows** — `publish-packages.yml` (the `gh-pages` republish) and its dispatch step in `release.yml` removed. `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` repository secrets are no longer consumed by CI.

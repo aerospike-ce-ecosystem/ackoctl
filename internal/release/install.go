@@ -14,10 +14,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // BinaryName is the file shipped inside the release archive.
 const BinaryName = "ackoctl"
+
+// downloadTimeout caps a single release-asset download. Generous compared to
+// internal/client's 30s API timeout because release archives are larger, but
+// still bounded so a stalled connection cannot hang the upgrade forever.
+const downloadTimeout = 5 * time.Minute
 
 // DownloadAndExtract pulls the archive for tag/goos/goarch, verifies its
 // sha256 against the matching checksums.txt entry, untars the embedded
@@ -138,9 +144,12 @@ func (c *Client) downloadFile(ctx context.Context, url, dst string) error {
 	}
 	req.Header.Set("User-Agent", userAgent)
 
-	// Use a default client for downloads — we want redirects followed here,
-	// unlike the Client.HTTP used for LatestTag.
-	resp, err := http.DefaultClient.Do(req)
+	// Use a dedicated client with an explicit timeout for downloads — we want
+	// redirects followed here (the default policy), unlike the Client.HTTP used
+	// for LatestTag, but we must not inherit http.DefaultClient's lack of a
+	// timeout.
+	httpClient := &http.Client{Timeout: downloadTimeout}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("download %s: %w", url, err)
 	}

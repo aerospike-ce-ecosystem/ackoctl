@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-15
+
 ### Added
 
 - **`ackoctl upgrade`** — in-place self-update. Resolves the latest tag from GitHub Releases, downloads the matching `tar.gz`, verifies the sha256 against `checksums.txt`, and atomically replaces the running binary. `--check` reports current vs. latest without installing; `--version vX.Y.Z` pins a specific release.
@@ -17,6 +19,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - **Linux install path simplified.** The shell one-liner (`curl … install.sh | sh`) is now the only documented channel on Linux. The signed APT / YUM repositories on `gh-pages` are retired — `install.sh` already covers OS/arch detection, sha256 verification, and `~/.local/bin` fallback. Homebrew remains the macOS channel.
 - **Goreleaser** — dropped the `nfpms` block; releases no longer ship `.deb` / `.rpm` / `.apk` artifacts. Only per-OS/arch `tar.gz` + `checksums.txt` + `install.sh` are uploaded.
 - **Workflows** — `publish-packages.yml` (the `gh-pages` republish) and its dispatch step in `release.yml` removed. `GPG_PRIVATE_KEY` and `GPG_PASSPHRASE` repository secrets are no longer consumed by CI.
+
+### Fixed
+
+- **`docs/usage.md` admin role flag corrected.** Sample showed `admin role create ... --privileges=read.test,sindex-admin.test`; the actual cobra flag is `--privilege` (singular, repeatable) and `parsePrivileges` splits the scope on `:`. Corrected to `--privilege=read:test --privilege=sindex-admin:test`.
+- **`internal/release/install.go` download timeout.** `downloadFile` previously used `http.DefaultClient` with no timeout. Now uses a dedicated `http.Client` bounded by a 5m `downloadTimeout`, matching the `internal/client` `defaultTimeout` pattern.
+- **`gofmt` drift gate.** Added a `Check gofmt` step to the `lint` job in `.github/workflows/ci.yml` that fails when `gofmt -l .` is non-empty, and reformatted 17 previously-unformatted files.
 
 ### Migration
 
@@ -48,5 +56,6 @@ First public release. Feature-complete coverage of the cluster-manager REST surf
 - Workspace ACL is explicit: every resource command honors `--workspace`, falling back to the current context's `workspace-id`. There is no silent "first workspace" default.
 - Initial release was validated end-to-end against ACKO + cluster-manager deployed on a kind cluster: config / k8s / connection / cluster / record / set / index / query commands all exercised. Two schema mismatches surfaced and were fixed (`K8sClusterListResponse` envelope, pointer-field rendering).
 
-[Unreleased]: https://github.com/aerospike-ce-ecosystem/ackoctl/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/aerospike-ce-ecosystem/ackoctl/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/aerospike-ce-ecosystem/ackoctl/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aerospike-ce-ecosystem/ackoctl/releases/tag/v0.1.0

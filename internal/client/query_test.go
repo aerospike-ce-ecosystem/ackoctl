@@ -21,9 +21,9 @@ func TestExecuteQueryWithPredicate(t *testing.T) {
 		_, _ = w.Write([]byte(`{"records":[{"key":{"namespace":"test","set":"u","pk":"alice"},"meta":{"generation":1,"ttl":0},"bins":{"age":30}}],"executionTimeMs":7,"scannedRecords":42,"returnedRecords":1}`))
 	})
 	resp, err := c.ExecuteQuery(context.Background(), "conn-1", QueryRequest{
-		Namespace: "test",
-		Set:       "u",
-		Predicate: &QueryPredicate{Bin: "age", Operator: "between", Value: 18, Value2: 30},
+		Namespace:  "test",
+		Set:        "u",
+		Predicate:  &QueryPredicate{Bin: "age", Operator: "between", Value: 18, Value2: 30},
 		SelectBins: []string{"name", "age"},
 	})
 	require.NoError(t, err)

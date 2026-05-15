@@ -123,4 +123,3 @@ func TestPrintTableNestedRawMap(t *testing.T) {
 	// empty slice should not crash and should render as [] on the value column
 	assert.Regexp(t, `nodes:\s+\[\]`, out)
 }
-

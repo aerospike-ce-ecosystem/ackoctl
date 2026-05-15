@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-// UpsertSetNote creates or updates a set-level note. ``note`` is the free
+// UpsertSetNote creates or updates a set-level note. “note“ is the free
 // text body; the server rejects empty / whitespace-only values. Use
 // DeleteSetNote to remove a note explicitly — the previous "PUT empty
 // string ⇒ delete" shortcut was a footgun and has been removed server-side.
@@ -34,7 +34,7 @@ func (c *BaseClient) DeleteSetNote(ctx context.Context, connID, namespace, set s
 }
 
 // ListSetNotes returns every set note for the connection, optionally
-// filtered by namespace. An empty ``namespace`` returns notes across all
+// filtered by namespace. An empty “namespace“ returns notes across all
 // namespaces visible to the caller.
 func (c *BaseClient) ListSetNotes(ctx context.Context, connID, namespace string) ([]SetNote, error) {
 	q := url.Values{}
@@ -48,10 +48,10 @@ func (c *BaseClient) ListSetNotes(ctx context.Context, connID, namespace string)
 	return out.Notes, nil
 }
 
-// UpsertRecordNote creates or updates a record-level note. ``pkType`` is
-// optional — when empty, the server defaults to ``auto`` which collapses to
-// the heuristic-resolved persistence type (``string|int|bytes``). Pass an
-// explicit ``pkType`` for digit-only string keys to avoid INTEGER
+// UpsertRecordNote creates or updates a record-level note. “pkType“ is
+// optional — when empty, the server defaults to “auto“ which collapses to
+// the heuristic-resolved persistence type (“string|int|bytes“). Pass an
+// explicit “pkType“ for digit-only string keys to avoid INTEGER
 // mis-classification.
 func (c *BaseClient) UpsertRecordNote(ctx context.Context, connID, namespace, set, pk, pkType, note string) (*RecordNote, error) {
 	if namespace == "" || set == "" || pk == "" {
@@ -66,7 +66,7 @@ func (c *BaseClient) UpsertRecordNote(ctx context.Context, connID, namespace, se
 	return &out, nil
 }
 
-// DeleteRecordNote removes the record note. ``pkType`` defaults to ``auto``
+// DeleteRecordNote removes the record note. “pkType“ defaults to “auto“
 // when empty — matching server behaviour. The endpoint is idempotent.
 func (c *BaseClient) DeleteRecordNote(ctx context.Context, connID, namespace, set, pk, pkType string) error {
 	if namespace == "" || set == "" || pk == "" {

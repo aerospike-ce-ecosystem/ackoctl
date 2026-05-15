@@ -7,18 +7,18 @@ import (
 	"net/url"
 )
 
-// TruncateSet wipes every record in ``namespace.setName`` on the connection,
+// TruncateSet wipes every record in “namespace.setName“ on the connection,
 // optionally up to a last-update-time cutoff. Destructive — callers must
 // gate this behind a confirmation flag.
 //
-// ``beforeLut`` is the cutoff in nanoseconds since CITRUS epoch:
-//   - ``nil``  — truncate the entire set (no cutoff).
+// “beforeLut“ is the cutoff in nanoseconds since CITRUS epoch:
+//   - “nil“  — truncate the entire set (no cutoff).
 //   - non-nil — truncate only records whose last-update-time is below
-//     the given value. Server rejects an explicit ``0`` to avoid the
+//     the given value. Server rejects an explicit “0“ to avoid the
 //     silent "lut=0 means truncate-all" footgun at the info-command
-//     layer; pass ``nil`` for a full wipe.
+//     layer; pass “nil“ for a full wipe.
 //
-// The endpoint returns either ``{"message": "..."}`` or ``204 No Content``;
+// The endpoint returns either “{"message": "..."}“ or “204 No Content“;
 // either is treated as success and the body is discarded.
 func (c *BaseClient) TruncateSet(ctx context.Context, connID, namespace, setName string, beforeLut *int64) error {
 	if namespace == "" || setName == "" {

@@ -17,7 +17,7 @@ import (
 
 // runAdminCmd mirrors runNoteCmd: builds a root command, points it at the
 // httptest server via env, and forces JSON output unless the test overrides
-// it. ``stdinBody`` is fed into ``cmd.InOrStdin()`` so --password-stdin paths
+// it. “stdinBody“ is fed into “cmd.InOrStdin()“ so --password-stdin paths
 // can be exercised without touching the real process stdin.
 func runAdminCmd(t *testing.T, srvURL, stdinBody string, args ...string) (string, string, error) {
 	t.Helper()

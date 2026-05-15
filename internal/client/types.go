@@ -51,18 +51,18 @@ type UpdateConnectionRequest struct {
 // ConnectionStatus mirrors cluster-manager's ConnectionStatus. /health always
 // returns 200 — Connected=false on unreachable clusters.
 type ConnectionStatus struct {
-	Connected       bool   `json:"connected"`
-	NodeCount       int    `json:"nodeCount"`
-	NamespaceCount  int    `json:"namespaceCount"`
-	Build           string `json:"build,omitempty"`
-	Edition         string `json:"edition,omitempty"`
-	MemoryUsed      int64  `json:"memoryUsed,omitempty"`
-	MemoryTotal     int64  `json:"memoryTotal,omitempty"`
-	DiskUsed        int64  `json:"diskUsed,omitempty"`
-	DiskTotal       int64  `json:"diskTotal,omitempty"`
-	TendHealthy     *bool  `json:"tendHealthy,omitempty"`
-	Error           string `json:"error,omitempty"`
-	ErrorType       string `json:"errorType,omitempty"`
+	Connected      bool   `json:"connected"`
+	NodeCount      int    `json:"nodeCount"`
+	NamespaceCount int    `json:"namespaceCount"`
+	Build          string `json:"build,omitempty"`
+	Edition        string `json:"edition,omitempty"`
+	MemoryUsed     int64  `json:"memoryUsed,omitempty"`
+	MemoryTotal    int64  `json:"memoryTotal,omitempty"`
+	DiskUsed       int64  `json:"diskUsed,omitempty"`
+	DiskTotal      int64  `json:"diskTotal,omitempty"`
+	TendHealthy    *bool  `json:"tendHealthy,omitempty"`
+	Error          string `json:"error,omitempty"`
+	ErrorType      string `json:"errorType,omitempty"`
 }
 
 // MessageResponse mirrors cluster-manager's MessageResponse used by several
@@ -107,24 +107,24 @@ type K8sClusterEvent struct {
 // first sync, RackId for non-rack-aware clusters). Slices use nil-as-omitted
 // semantics so JSON round-trips preserve "field absent" vs "empty list".
 type K8sPodStatus struct {
-	Name                     string   `json:"name"`
-	PodIP                    string   `json:"podIP,omitempty"`
-	HostIP                   string   `json:"hostIP,omitempty"`
-	IsReady                  bool     `json:"isReady"`
-	ReadinessGateSatisfied   *bool    `json:"readinessGateSatisfied,omitempty"`
-	Phase                    string   `json:"phase,omitempty"`
-	Image                    string   `json:"image,omitempty"`
-	DynamicConfigStatus      string   `json:"dynamicConfigStatus,omitempty"`
-	NodeID                   string   `json:"nodeId,omitempty"`
-	RackID                   *int     `json:"rackId,omitempty"`
-	ConfigHash               string   `json:"configHash,omitempty"`
-	PodSpecHash              string   `json:"podSpecHash,omitempty"`
-	AccessEndpoints          []string `json:"accessEndpoints,omitempty"`
-	ServicePort              *int     `json:"servicePort,omitempty"`
+	Name                   string   `json:"name"`
+	PodIP                  string   `json:"podIP,omitempty"`
+	HostIP                 string   `json:"hostIP,omitempty"`
+	IsReady                bool     `json:"isReady"`
+	ReadinessGateSatisfied *bool    `json:"readinessGateSatisfied,omitempty"`
+	Phase                  string   `json:"phase,omitempty"`
+	Image                  string   `json:"image,omitempty"`
+	DynamicConfigStatus    string   `json:"dynamicConfigStatus,omitempty"`
+	NodeID                 string   `json:"nodeId,omitempty"`
+	RackID                 *int     `json:"rackId,omitempty"`
+	ConfigHash             string   `json:"configHash,omitempty"`
+	PodSpecHash            string   `json:"podSpecHash,omitempty"`
+	AccessEndpoints        []string `json:"accessEndpoints,omitempty"`
+	ServicePort            *int     `json:"servicePort,omitempty"`
 	// PodPort is Aerospike's pod-port (the inter-pod fabric/cluster mesh port).
 	// The server's K8sPodStatus uses the JSON key `podPort`; an earlier draft
 	// of this client used `clusterPort` which never decoded.
-	PodPort                  *int     `json:"podPort,omitempty"`
+	PodPort *int `json:"podPort,omitempty"`
 }
 
 // K8sLogsOptions carries the optional query parameters for
@@ -271,12 +271,12 @@ type SecondaryIndex struct {
 }
 
 // TruncateSetRequest mirrors cluster-manager's TruncateSetRequest body for
-// ``POST /sets/{conn_id}/{namespace}/{set_name}/truncate``. ``BeforeLut`` is
+// “POST /sets/{conn_id}/{namespace}/{set_name}/truncate“. “BeforeLut“ is
 // the optional cutoff in nanoseconds since CITRUS epoch (aerospike-py's
-// ``truncate`` ``nanos`` parameter) — only records with last-update-time
+// “truncate“ “nanos“ parameter) — only records with last-update-time
 // below this threshold get truncated. A pointer is used so the client can
-// emit a literal ``null`` (or omit the key) when the caller wants a full
-// truncate, distinct from sending ``"beforeLut": 0`` which the server
+// emit a literal “null“ (or omit the key) when the caller wants a full
+// truncate, distinct from sending “"beforeLut": 0“ which the server
 // rejects as ambiguous (lut=0 means "no cutoff" at the info-command level
 // and would silently turn a buggy zero into a full wipe).
 type TruncateSetRequest struct {
@@ -294,8 +294,8 @@ type CreateIndexRequest struct {
 
 // SetNote mirrors cluster-manager's SetNote — a free-text operator memo
 // attached to (connectionId, namespace, setName). Notes live in
-// cluster-manager's metaDB, not in Aerospike. ``updatedBy`` is the OIDC
-// ``sub`` of the most recent writer, or empty when running under bearer
+// cluster-manager's metaDB, not in Aerospike. “updatedBy“ is the OIDC
+// “sub“ of the most recent writer, or empty when running under bearer
 // token / anonymous auth.
 type SetNote struct {
 	ConnectionID string `json:"connectionId"`
@@ -308,9 +308,9 @@ type SetNote struct {
 }
 
 // RecordNote mirrors cluster-manager's RecordNote — adds the primary key
-// fields to SetNote. The persisted ``pkType`` is the resolved type
-// (``string|int|bytes``); ``auto`` is a request-time hint only.
-// ``digestHex`` is verification-only — derived from (set, pk), never used
+// fields to SetNote. The persisted “pkType“ is the resolved type
+// (“string|int|bytes“); “auto“ is a request-time hint only.
+// “digestHex“ is verification-only — derived from (set, pk), never used
 // as a join key.
 type RecordNote struct {
 	ConnectionID string `json:"connectionId"`
@@ -326,37 +326,37 @@ type RecordNote struct {
 }
 
 // UpsertSetNoteRequest mirrors cluster-manager's UpsertSetNoteRequest body
-// for ``PUT /notes/sets/...``. The server rejects empty / whitespace-only
-// notes (``min_length=1``); use the DELETE endpoint to remove.
+// for “PUT /notes/sets/...“. The server rejects empty / whitespace-only
+// notes (“min_length=1“); use the DELETE endpoint to remove.
 type UpsertSetNoteRequest struct {
 	Note string `json:"note"`
 }
 
 // UpsertRecordNoteRequest mirrors cluster-manager's UpsertRecordNoteRequest
-// body for ``PUT /notes/records/...``. ``PKType`` defaults to ``auto`` on
+// body for “PUT /notes/records/...“. “PKType“ defaults to “auto“ on
 // the server when omitted; we pass it through verbatim. The wire key is the
-// canonical Pydantic alias ``pk_type`` so this keeps working if the server
-// disables ``populate_by_name`` (Pydantic v3 default).
+// canonical Pydantic alias “pk_type“ so this keeps working if the server
+// disables “populate_by_name“ (Pydantic v3 default).
 type UpsertRecordNoteRequest struct {
 	Note   string `json:"note"`
 	PKType string `json:"pk_type,omitempty"`
 }
 
 // SetNotesListResponse mirrors the {"notes": [...]} envelope returned by
-// ``GET /notes/sets/{conn_id}``.
+// “GET /notes/sets/{conn_id}“.
 type SetNotesListResponse struct {
 	Notes []SetNote `json:"notes"`
 }
 
 // RecordNotesListResponse mirrors the {"notes": [...]} envelope returned by
-// ``GET /notes/records/{conn_id}``.
+// “GET /notes/records/{conn_id}“.
 type RecordNotesListResponse struct {
 	Notes []RecordNote `json:"notes"`
 }
 
 // UDFModule mirrors cluster-manager's UDFModule from
-// ``aerospike_cluster_manager_api.models.udf``. Type is fixed to ``"LUA"``
-// today (the only language Aerospike CE supports). ``Content`` is only set on
+// “aerospike_cluster_manager_api.models.udf“. Type is fixed to “"LUA"“
+// today (the only language Aerospike CE supports). “Content“ is only set on
 // the upload response when the post-upload re-fetch can't find the module,
 // otherwise it is omitted.
 type UDFModule struct {
@@ -367,17 +367,17 @@ type UDFModule struct {
 }
 
 // UploadUDFRequest mirrors cluster-manager's UploadUDFRequest body for
-// ``POST /udfs/{conn_id}``. ``Content`` is the raw Lua source as a JSON
+// “POST /udfs/{conn_id}“. “Content“ is the raw Lua source as a JSON
 // string — the server writes it to disk and registers via aerospike-py's
-// ``udf_put``. ``Filename`` is validated server-side against
-// ``^[a-zA-Z0-9_.-]{1,255}$``.
+// “udf_put“. “Filename“ is validated server-side against
+// “^[a-zA-Z0-9_.-]{1,255}$“.
 type UploadUDFRequest struct {
 	Filename string `json:"filename"`
 	Content  string `json:"content"`
 }
 
 // AerospikeUser mirrors cluster-manager's AerospikeUser. Returned by
-// ``GET /admin/{conn_id}/users``. Quota and connection counters are pointers
+// “GET /admin/{conn_id}/users“. Quota and connection counters are pointers
 // so we can distinguish "server omitted the field" (older builds) from
 // "explicit zero". Older Pydantic models always serialised the integer, but
 // the optional shape keeps ackoctl resilient if that ever changes.
@@ -390,8 +390,8 @@ type AerospikeUser struct {
 }
 
 // CreateUserRequest mirrors cluster-manager's CreateUserRequest body for
-// ``POST /admin/{conn_id}/users``. ``Roles`` is optional and omitted from
-// the wire when nil to match the Pydantic ``list[str] | None`` field.
+// “POST /admin/{conn_id}/users“. “Roles“ is optional and omitted from
+// the wire when nil to match the Pydantic “list[str] | None“ field.
 type CreateUserRequest struct {
 	Username string   `json:"username"`
 	Password string   `json:"password"`
@@ -399,16 +399,16 @@ type CreateUserRequest struct {
 }
 
 // ChangePasswordRequest mirrors cluster-manager's ChangePasswordRequest body
-// for ``PATCH /admin/{conn_id}/users``. The PATCH endpoint is password-only;
+// for “PATCH /admin/{conn_id}/users“. The PATCH endpoint is password-only;
 // it does not mutate roles or quotas.
 type ChangePasswordRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-// RolePrivilege mirrors cluster-manager's Privilege model. ``Namespace`` and
-// ``Set`` are omitted from the wire when empty to match the
-// ``str | None`` shape — the server treats absent and null identically.
+// RolePrivilege mirrors cluster-manager's Privilege model. “Namespace“ and
+// “Set“ are omitted from the wire when empty to match the
+// “str | None“ shape — the server treats absent and null identically.
 type RolePrivilege struct {
 	Code      string `json:"code"`
 	Namespace string `json:"namespace,omitempty"`
@@ -416,7 +416,7 @@ type RolePrivilege struct {
 }
 
 // AerospikeRole mirrors cluster-manager's AerospikeRole. Returned by
-// ``GET /admin/{conn_id}/roles``. Quotas are pointers for the same reason
+// “GET /admin/{conn_id}/roles“. Quotas are pointers for the same reason
 // as AerospikeUser.
 type AerospikeRole struct {
 	Name       string          `json:"name"`
@@ -427,7 +427,7 @@ type AerospikeRole struct {
 }
 
 // CreateRoleRequest mirrors cluster-manager's CreateRoleRequest body for
-// ``POST /admin/{conn_id}/roles``. Quotas and whitelist are nillable so
+// “POST /admin/{conn_id}/roles“. Quotas and whitelist are nillable so
 // unset values are omitted from the JSON body and the server applies its
 // own defaults rather than seeing an explicit 0 / empty list.
 type CreateRoleRequest struct {
@@ -439,15 +439,15 @@ type CreateRoleRequest struct {
 }
 
 // InfoCommandResult mirrors cluster-manager's per-(node, command) row in the
-// asinfo passthrough response. ``Output`` carries the raw asinfo payload
-// verbatim — typically a string like ``"8.1.0.0"`` for ``build`` or a
-// semicolon-delimited stat blob for ``statistics``. ``Error`` is set when a
+// asinfo passthrough response. “Output“ carries the raw asinfo payload
+// verbatim — typically a string like “"8.1.0.0"“ for “build“ or a
+// semicolon-delimited stat blob for “statistics“. “Error“ is set when a
 // single node failed while peers succeeded (partial fan-out), so callers can
 // surface a row-level failure without losing the rest of the matrix.
 type InfoCommandResult struct {
-	Command string  `json:"command"`
-	Node    string  `json:"node"`
-	Output  string  `json:"output"`
+	Command string `json:"command"`
+	Node    string `json:"node"`
+	Output  string `json:"output"`
 	// Error is a pointer so JSON round-trips preserve the distinction
 	// between "successful row" (server sends `"error": null`, we keep nil)
 	// and "row-level failure" (server sends a string). With omitempty the
@@ -457,9 +457,9 @@ type InfoCommandResult struct {
 }
 
 // ExecuteInfoRequest mirrors cluster-manager's request body for
-// ``POST /clusters/{conn_id}/info``. ``Node`` is optional — when empty the
+// “POST /clusters/{conn_id}/info“. “Node“ is optional — when empty the
 // server fans out across all nodes (one result per node per command).
-// ``ReadOnly`` defaults to true on the wire; when false the server bypasses
+// “ReadOnly“ defaults to true on the wire; when false the server bypasses
 // its asinfo verb whitelist and forwards any command (write-capable).
 type ExecuteInfoRequest struct {
 	Commands []string `json:"commands"`
@@ -467,8 +467,8 @@ type ExecuteInfoRequest struct {
 	ReadOnly bool     `json:"readOnly"`
 }
 
-// ExecuteInfoResponse mirrors the ``{"results": [...]}`` envelope returned by
-// ``POST /clusters/{conn_id}/info``.
+// ExecuteInfoResponse mirrors the “{"results": [...]}“ envelope returned by
+// “POST /clusters/{conn_id}/info“.
 type ExecuteInfoResponse struct {
 	Results []InfoCommandResult `json:"results"`
 }

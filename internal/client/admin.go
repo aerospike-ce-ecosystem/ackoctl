@@ -29,7 +29,7 @@ func (c *BaseClient) ListAdminUsers(ctx context.Context, connID string) ([]Aeros
 }
 
 // CreateAdminUser creates a new Aerospike user. The server returns 201 with
-// the created user echoed back. ``roles`` may be nil — the wire body omits
+// the created user echoed back. “roles“ may be nil — the wire body omits
 // the field so the server defers to its default ("no roles").
 func (c *BaseClient) CreateAdminUser(ctx context.Context, connID string, req CreateUserRequest) (*AerospikeUser, error) {
 	if connID == "" {
@@ -64,8 +64,8 @@ func (c *BaseClient) ChangeAdminUserPassword(ctx context.Context, connID string,
 }
 
 // DeleteAdminUser drops a user. The endpoint returns 204 on success.
-// ``username`` is sent as a query parameter to match the server contract
-// (``username: str = Query(..., min_length=1)``).
+// “username“ is sent as a query parameter to match the server contract
+// (“username: str = Query(..., min_length=1)“).
 func (c *BaseClient) DeleteAdminUser(ctx context.Context, connID, username string) error {
 	if connID == "" {
 		return fmt.Errorf("connID is required")
@@ -114,7 +114,7 @@ func (c *BaseClient) CreateAdminRole(ctx context.Context, connID string, req Cre
 }
 
 // DeleteAdminRole drops a role. The endpoint returns 204 on success and
-// surfaces the role name as a query parameter (``name: str = Query(...)``).
+// surfaces the role name as a query parameter (“name: str = Query(...)“).
 func (c *BaseClient) DeleteAdminRole(ctx context.Context, connID, name string) error {
 	if connID == "" {
 		return fmt.Errorf("connID is required")

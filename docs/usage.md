@@ -191,7 +191,7 @@ ackoctl admin user delete <CONN_ID> --username=alice --yes
 
 # Roles
 ackoctl admin role list   <CONN_ID>
-ackoctl admin role create <CONN_ID> --name=analyst --privileges=read.test,sindex-admin.test
+ackoctl admin role create <CONN_ID> --name=analyst --privilege=read:test --privilege=sindex-admin:test
 ackoctl admin role delete <CONN_ID> --name=analyst --yes
 ```
 

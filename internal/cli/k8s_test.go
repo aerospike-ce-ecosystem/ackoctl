@@ -50,8 +50,8 @@ func TestFilterEventsSinceZeroReturnsAll(t *testing.T) {
 func TestFilterEventsSinceDropsOlderThanCutoff(t *testing.T) {
 	now := time.Date(2026, 5, 13, 12, 0, 0, 0, time.UTC)
 	events := []client.K8sClusterEvent{
-		{Reason: "old", LastTimestamp: "2026-05-13T10:00:00Z"},      // 2h ago, before cutoff
-		{Reason: "fresh", LastTimestamp: "2026-05-13T11:50:00Z"},    // 10m ago
+		{Reason: "old", LastTimestamp: "2026-05-13T10:00:00Z"},         // 2h ago, before cutoff
+		{Reason: "fresh", LastTimestamp: "2026-05-13T11:50:00Z"},       // 10m ago
 		{Reason: "exactCutoff", LastTimestamp: "2026-05-13T11:00:00Z"}, // exactly cutoff — kept under >= semantics
 	}
 	got := filterEventsSince(events, 1*time.Hour, now)

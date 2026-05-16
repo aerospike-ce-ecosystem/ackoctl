@@ -135,6 +135,8 @@ func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read password from stdin (mutually exclusive with --password)")
 	cmd.Flags().StringSliceVar(&roles, "roles", nil, "comma-separated role names to assign (optional)")
 	_ = cmd.MarkFlagRequired("username")
+	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
+	cmd.MarkFlagsOneRequired("password", "password-stdin")
 	return cmd
 }
 
@@ -177,6 +179,8 @@ password-only.`,
 	cmd.Flags().StringVar(&password, "password", "", "new password in plaintext — visible in shell history; prefer --password-stdin")
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read password from stdin (mutually exclusive with --password)")
 	_ = cmd.MarkFlagRequired("username")
+	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
+	cmd.MarkFlagsOneRequired("password", "password-stdin")
 	return cmd
 }
 

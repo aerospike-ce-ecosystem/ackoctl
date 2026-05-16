@@ -209,7 +209,11 @@ func TestAdminUserCreateRejectsBothPasswordModes(t *testing.T) {
 		"--username", "alice", "--password", "p", "--password-stdin",
 	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "mutually exclusive")
+	// Cobra's MarkFlagsMutuallyExclusive emits "none of the others can be"
+	// when both flags are set; resolvePassword's fallback says "mutually
+	// exclusive". Accept either so the assertion survives the cobra-level
+	// guard added on top of the runtime check.
+	assert.Regexp(t, "mutually exclusive|none of the others can be", err.Error())
 }
 
 func TestAdminUserCreateRequiresUsername(t *testing.T) {

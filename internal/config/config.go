@@ -74,14 +74,39 @@ func Save(path string, cfg *Config) error {
 	if cfg.Kind == "" {
 		cfg.Kind = Kind
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	// Atomic write: temp file in same dir + rename, with 0600 perms enforced
+	// regardless of any pre-existing file mode. Prevents credential exposure
+	// and avoids truncation on disk-full / interrupted writes.
+	tmp, err := os.CreateTemp(dir, ".ackoctl-config-*.yaml.tmp")
+	if err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"io/fs"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -32,6 +34,22 @@ func TestUpsertAndSaveRoundTrip(t *testing.T) {
 	prod, _ := loaded.Find("prod")
 	require.NotNil(t, prod)
 	assert.Equal(t, "t", prod.Token)
+}
+
+func TestSaveEnforces0600OverExistingLoosePerms(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	// Pre-create the file world-readable to prove the atomic write replaces
+	// the inode rather than truncating in place — the config can hold bearer
+	// tokens and must never be left group/world readable.
+	require.NoError(t, os.WriteFile(path, []byte("stale"), 0o644))
+
+	cfg := &Config{}
+	cfg.Upsert(Context{Name: "prod", Server: "https://acm.example.com/api", Token: "secret-token"})
+	require.NoError(t, Save(path, cfg))
+
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o600), info.Mode().Perm())
 }
 
 func TestUpsertReplacesExisting(t *testing.T) {

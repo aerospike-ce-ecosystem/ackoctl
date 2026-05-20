@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -42,6 +43,21 @@ func WaitForBackgroundChecks(timeout time.Duration) {
 	}
 }
 
+// versionCheckOptedOut reports whether the startup version check is disabled,
+// either by the --no-version-check flag or a truthy ACKOCTL_NO_VERSION_CHECK
+// value. ParseBool accepts "1", "true", "t", etc. — the same boolean grammar
+// used by ACKOCTL_INSECURE_SKIP_TLS — so users are not surprised when
+// ACKOCTL_NO_VERSION_CHECK=true behaves like ACKOCTL_NO_VERSION_CHECK=1. An
+// unparseable value is treated as "not opted out": the check is advisory, so
+// the safe default is to keep it on.
+func versionCheckOptedOut(flag bool) bool {
+	if flag {
+		return true
+	}
+	v, _ := strconv.ParseBool(os.Getenv(envOptOut))
+	return v
+}
+
 // runVersionCheck is invoked from the root command's PersistentPreRunE. It:
 //   - reads the on-disk cache; if fresh + outdated, prints a one-line warning;
 //   - fires a detached goroutine to refresh the cache for the next run.
@@ -49,7 +65,7 @@ func WaitForBackgroundChecks(timeout time.Duration) {
 // The function never returns an error to the command runner — the check is
 // strictly advisory.
 func runVersionCheck(cmd *cobra.Command, optOut bool) {
-	if optOut || os.Getenv(envOptOut) == "1" {
+	if versionCheckOptedOut(optOut) {
 		return
 	}
 	if shouldSkipVersionCheck(cmd) {

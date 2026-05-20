@@ -10,7 +10,8 @@ internal/cli/        cobra commands (one file per noun)
 internal/client/     REST client for cluster-manager
 internal/config/     ~/.ackoctl/config.yaml parser (kubeconfig style)
 internal/output/     -o table|json|yaml formatter
-test/e2e/            kind-based smoke tests + openapi drift check
+internal/release/    self-update (`ackoctl upgrade`) + startup version check
+docs/                usage, install, and the manual e2e-kind scenario
 ```
 
 ## Conventions
@@ -27,12 +28,12 @@ test/e2e/            kind-based smoke tests + openapi drift check
 2. Add request/response types to `internal/client/types.go` (mirror Pydantic models but only fields ackoctl uses).
 3. Add a method on `BaseClient` in the matching `internal/client/<noun>s.go` file.
 4. Add the cobra command in `internal/cli/<noun>.go`.
-5. Extend `test/e2e/openapi_test.go` to assert the endpoint still exists in the live spec.
+5. Add an httptest round-trip test in `internal/client/<noun>s_test.go` and a cobra-level test in `internal/cli/<noun>_test.go`, mirroring the existing noun tests.
 
 ## Test layers
 
-- **Unit**: `go test ./internal/...` — fast, hermetic, runs in CI.
-- **E2E**: `make test-e2e` — requires kind + cluster-manager up, drives real CLI invocations.
+- **Unit**: `go test ./...` (or `make test`) — fast, hermetic, runs in CI.
+- **E2E**: `docs/e2e-kind.md` — a manual kind + ACKO + cluster-manager scenario. There is no automated e2e suite or `make test-e2e` target.
 
 ## Versioning & release
 

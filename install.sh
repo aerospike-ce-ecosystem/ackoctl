@@ -86,28 +86,31 @@ curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
   || err "download failed; check that release $VERSION has the asset $ARCHIVE"
 
 # --- Checksum verification ---------------------------------------------------
+#
+# Every failure path here is fatal. This is a curl-piped installer, so the
+# threat model is exactly a tampered download — falling back to an unverified
+# binary would defeat the guarantee the checksum exists to provide. goreleaser
+# publishes checksums.txt for every release, so a missing file/entry means a
+# network problem, a MITM, or a malformed release — never a normal install.
 
-if curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
-    -o "$TMP/checksums.txt" "$CHECKSUM_URL"; then
-  log "verifying checksum"
-  EXPECTED=$(grep " $ARCHIVE\$" "$TMP/checksums.txt" | awk '{print $1}')
-  if [ -z "$EXPECTED" ]; then
-    warn "no checksum entry for $ARCHIVE; skipping verification"
-  else
-    if command -v sha256sum >/dev/null 2>&1; then
-      ACTUAL=$(sha256sum "$TMP/$ARCHIVE" | awk '{print $1}')
-    elif command -v shasum >/dev/null 2>&1; then
-      ACTUAL=$(shasum -a 256 "$TMP/$ARCHIVE" | awk '{print $1}')
-    else
-      warn "no sha256sum/shasum available; skipping verification"
-      ACTUAL="$EXPECTED"
-    fi
-    [ "$ACTUAL" = "$EXPECTED" ] || err "checksum mismatch ($ACTUAL != $EXPECTED)"
-    ok "checksum verified"
-  fi
+curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
+  -o "$TMP/checksums.txt" "$CHECKSUM_URL" \
+  || err "could not download $CHECKSUM_URL — refusing to install an unverified binary"
+
+log "verifying checksum"
+EXPECTED=$(grep " $ARCHIVE\$" "$TMP/checksums.txt" | awk '{print $1}')
+[ -n "$EXPECTED" ] || err "no checksum entry for $ARCHIVE in checksums.txt"
+
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL=$(sha256sum "$TMP/$ARCHIVE" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL=$(shasum -a 256 "$TMP/$ARCHIVE" | awk '{print $1}')
 else
-  warn "checksums.txt not found; skipping verification"
+  err "neither sha256sum nor shasum is available — cannot verify the download"
 fi
+
+[ "$ACTUAL" = "$EXPECTED" ] || err "checksum mismatch ($ACTUAL != $EXPECTED)"
+ok "checksum verified"
 
 # --- Extract & install -------------------------------------------------------
 

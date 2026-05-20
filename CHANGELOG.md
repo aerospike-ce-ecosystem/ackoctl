@@ -13,7 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Changed
 
-- **`query exec` predicate validation completed.** `--op between` now requires both `--value` and `--value2` client-side; `--value2` is rejected with any non-`between` operator; and a lone `--value2` is no longer silently dropped before predicate detection. These errors surface before the API call instead of as an opaque `422`.
+- **`query exec` predicate validation completed.** Building a predicate now requires `--value`; `--op between` additionally requires `--value2`; `--value2` is rejected with any non-`between` operator; and a lone `--value2` is no longer silently dropped before predicate detection. These errors surface before the API call instead of as an opaque `422`.
 - **`admin user create` / `admin user passwd` password flags.** `--password` and `--password-stdin` are marked mutually exclusive and one-of-required, so cobra prints usage when both or neither is supplied instead of a bare error string.
 
 ### Fixed

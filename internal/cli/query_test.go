@@ -88,9 +88,22 @@ func runQueryCmd(t *testing.T, srvURL string, args ...string) (string, error) {
 	return stdout.String(), err
 }
 
-func TestQueryExecBetweenRequiresBothValues(t *testing.T) {
+func TestQueryExecPredicateRequiresValue(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Fatal("server should not be hit when --op between is missing a bound")
+		t.Fatal("server should not be hit when a predicate has no --value")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "equals",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--value is required when building a predicate")
+}
+
+func TestQueryExecBetweenRequiresValue2(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --op between is missing the upper bound")
 	}))
 	t.Cleanup(srv.Close)
 	_, err := runQueryCmd(t, srv.URL,
@@ -98,7 +111,20 @@ func TestQueryExecBetweenRequiresBothValues(t *testing.T) {
 		"--namespace", "test", "--bin", "age", "--op", "between", "--value", "10",
 	)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "--value and --value2 are both required")
+	assert.Contains(t, err.Error(), "--value2 is required when --op is 'between'")
+}
+
+func TestQueryExecBetweenRequiresValue(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --op between is missing the lower bound")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "between", "--value2", "20",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--value is required when building a predicate")
 }
 
 func TestQueryExecValue2RejectedWithoutBetween(t *testing.T) {

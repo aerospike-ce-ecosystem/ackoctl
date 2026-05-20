@@ -49,27 +49,30 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 				if bin == "" || op == "" {
 					return fmt.Errorf("--bin and --op are required together when building a predicate")
 				}
+				// Every supported operator (equals, between, contains, geo_*)
+				// needs at least one operand, so --value is always required.
+				if valueRaw == "" {
+					return fmt.Errorf("--value is required when building a predicate")
+				}
 				if op == "between" {
-					if valueRaw == "" || value2Raw == "" {
-						return fmt.Errorf("--value and --value2 are both required when --op is 'between'")
+					if value2Raw == "" {
+						return fmt.Errorf("--value2 is required when --op is 'between'")
 					}
 				} else if value2Raw != "" {
 					return fmt.Errorf("--value2 is only valid when --op is 'between'")
 				}
 				pred := &client.QueryPredicate{Bin: bin, Operator: op}
-				if valueRaw != "" {
-					v, err := parseJSONScalar(valueRaw)
-					if err != nil {
-						return fmt.Errorf("--value: %w", err)
-					}
-					pred.Value = v
+				v, err := parseJSONScalar(valueRaw)
+				if err != nil {
+					return fmt.Errorf("--value: %w", err)
 				}
+				pred.Value = v
 				if value2Raw != "" {
-					v, err := parseJSONScalar(value2Raw)
+					v2, err := parseJSONScalar(value2Raw)
 					if err != nil {
 						return fmt.Errorf("--value2: %w", err)
 					}
-					pred.Value2 = v
+					pred.Value2 = v2
 				}
 				req.Predicate = pred
 			}

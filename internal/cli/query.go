@@ -45,12 +45,16 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 				PrimaryKey: primaryKey,
 				PKType:     pkType,
 			}
-			if op != "" || bin != "" || valueRaw != "" {
+			if op != "" || bin != "" || valueRaw != "" || value2Raw != "" {
 				if bin == "" || op == "" {
 					return fmt.Errorf("--bin and --op are required together when building a predicate")
 				}
-				if op == "between" && value2Raw == "" {
-					return fmt.Errorf("--value2 is required when --op is 'between'")
+				if op == "between" {
+					if valueRaw == "" || value2Raw == "" {
+						return fmt.Errorf("--value and --value2 are both required when --op is 'between'")
+					}
+				} else if value2Raw != "" {
+					return fmt.Errorf("--value2 is only valid when --op is 'between'")
 				}
 				pred := &client.QueryPredicate{Bin: bin, Operator: op}
 				if valueRaw != "" {

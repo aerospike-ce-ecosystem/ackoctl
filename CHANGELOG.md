@@ -6,6 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Security
+
+- **`install.sh` no longer installs unverified binaries.** Previously a missing `checksums.txt`, a missing checksum entry, or the absence of `sha256sum`/`shasum` each downgraded to a warning and installed the binary anyway — and the missing-tool path even printed "checksum verified" without verifying anything. For a `curl … | sh` installer the threat model is exactly a tampered download, so all three paths are now fatal errors.
+- **`config.Save` writes atomically with `0600` enforced.** The config file (which may hold bearer tokens) is now written through a temp file + atomic rename with `0600` permissions applied regardless of any pre-existing file mode, preventing credential exposure on an already-loose file and avoiding truncation on disk-full / interrupted writes.
+
+### Changed
+
+- **`query exec` predicate validation completed.** `--op between` now requires both `--value` and `--value2` client-side; `--value2` is rejected with any non-`between` operator; and a lone `--value2` is no longer silently dropped before predicate detection. These errors surface before the API call instead of as an opaque `422`.
+- **`admin user create` / `admin user passwd` password flags.** `--password` and `--password-stdin` are marked mutually exclusive and one-of-required, so cobra prints usage when both or neither is supplied instead of a bare error string.
+
+### Fixed
+
+- **`ACKOCTL_NO_VERSION_CHECK` accepts any truthy value.** It previously recognised only `=1`; `=true` — the boolean grammar already used by `ACKOCTL_INSECURE_SKIP_TLS` — was silently ignored. It now parses via `strconv.ParseBool`.
+
 ## [0.2.0] — 2026-05-15
 
 ### Added

@@ -59,5 +59,8 @@ func TestDeleteIndexRequiresFields(t *testing.T) {
 		t.Fatal("server should not be hit")
 	})
 	err := c.DeleteIndex(context.Background(), "conn-1", "", "idx")
-	require.Error(t, err)
+	require.Error(t, err, "empty namespace must be rejected client-side")
+
+	err = c.DeleteIndex(context.Background(), "conn-1", "test", "")
+	require.Error(t, err, "empty index name must be rejected client-side")
 }

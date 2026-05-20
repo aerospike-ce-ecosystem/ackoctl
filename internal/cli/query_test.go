@@ -1,6 +1,11 @@
 package cli
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,4 +63,88 @@ func TestParseJSONScalarNegativeNumber(t *testing.T) {
 	v, err := parseJSONScalar("-3.14")
 	require.NoError(t, err)
 	assert.Equal(t, -3.14, v)
+}
+
+// ---------------------------------------------------------------------------
+// query exec predicate validation
+// ---------------------------------------------------------------------------
+
+// runQueryCmd builds a root command, points it at srvURL via env, and forces
+// JSON output. Predicate validation runs before any HTTP call, so the
+// validation tests pass a server that fails the test if it is ever hit.
+func runQueryCmd(t *testing.T, srvURL string, args ...string) (string, error) {
+	t.Helper()
+	root := NewRootCmd()
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srvURL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs(append([]string{"--output", "json"}, args...))
+	root.SetContext(context.Background())
+	err := root.Execute()
+	return stdout.String(), err
+}
+
+func TestQueryExecBetweenRequiresBothValues(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --op between is missing a bound")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "between", "--value", "10",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--value and --value2 are both required")
+}
+
+func TestQueryExecValue2RejectedWithoutBetween(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --value2 is paired with a non-between op")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "equals", "--value", "10", "--value2", "20",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--value2 is only valid when --op is 'between'")
+}
+
+func TestQueryExecValue2AloneRequiresBinAndOp(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --value2 is supplied without --bin/--op")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1", "--namespace", "test", "--value2", "20",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "--bin and --op are required together")
+}
+
+func TestQueryExecBetweenRoundTrip(t *testing.T) {
+	var pred map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v1/query/conn-1", r.URL.Path)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		pred, _ = body["predicate"].(map[string]any)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"records":[],"executionTimeMs":1,"scannedRecords":0,"returnedRecords":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "between", "--value", "10", "--value2", "20",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, pred)
+	assert.Equal(t, "between", pred["operator"])
+	assert.Equal(t, float64(10), pred["value"])
+	assert.Equal(t, float64(20), pred["value2"])
 }

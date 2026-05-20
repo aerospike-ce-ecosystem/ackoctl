@@ -48,17 +48,57 @@ func Print(w io.Writer, format Format, data any, opts ...Option) error {
 		enc.SetIndent("", "  ")
 		return enc.Encode(data)
 	case FormatYAML:
-		enc := yaml.NewEncoder(w)
-		enc.SetIndent(2)
-		if err := enc.Encode(data); err != nil {
-			_ = enc.Close()
-			return err
-		}
-		return enc.Close()
+		return writeYAML(w, data)
 	case FormatTable, "":
 		return writeTable(w, data, cfg)
 	default:
 		return fmt.Errorf("unsupported format %q", format)
+	}
+}
+
+// writeYAML marshals data to YAML by routing it through JSON first. The
+// response structs in internal/client carry only `json:` tags; marshaling
+// them directly with gopkg.in/yaml.v3 would lowercase every field name
+// (connectionId -> connectionid) and ignore omitempty, breaking parity with
+// `-o json`. Going JSON -> yaml.Node -> YAML makes the single `json:` tag set
+// govern both formats, so new structs stay consistent for free.
+//
+// JSON is a strict subset of YAML, so the JSON bytes parse straight into a
+// yaml.Node. Decoding into a node (rather than into `any`) preserves each
+// number's exact textual form — decoding into `any` would route every number
+// through float64 and lose precision on large int64 values (e.g. memory byte
+// counts, lastUpdateMs timestamps).
+func writeYAML(w io.Writer, data any) error {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	var node yaml.Node
+	if err := yaml.Unmarshal(jsonBytes, &node); err != nil {
+		return err
+	}
+	// yaml.Unmarshal carries the source's flow style onto every node, so a
+	// JSON document would re-emit as `{"a": 1}` instead of block YAML. Clear
+	// the style tree-wide; the encoder then re-derives any quoting it still
+	// needs from each scalar's resolved tag (e.g. a string "true" stays
+	// quoted so it does not round-trip as a bool).
+	clearYAMLStyle(&node)
+	enc := yaml.NewEncoder(w)
+	enc.SetIndent(2)
+	if err := enc.Encode(&node); err != nil {
+		_ = enc.Close()
+		return err
+	}
+	return enc.Close()
+}
+
+// clearYAMLStyle resets the Style field on a node and all its descendants so
+// the encoder emits block YAML regardless of the style inherited from the
+// parsed source.
+func clearYAMLStyle(n *yaml.Node) {
+	n.Style = 0
+	for _, child := range n.Content {
+		clearYAMLStyle(child)
 	}
 }
 

@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 
+- **`-o yaml` now matches `-o json` key naming and `omitempty` policy** ([#33](https://github.com/aerospike-ce-ecosystem/ackoctl/issues/33)). The response structs carry only `json:` tags, so marshaling them straight through `gopkg.in/yaml.v3` lowercased every field (`connectionId` → `connectionid`, `pkText` → `pktext`) and emitted empty optional fields that JSON drops (`digestHex: ""`). YAML output is now routed through JSON first, so the single `json:` tag set governs both formats — keys stay camelCase, `omitempty` is honored consistently, and large `int64` values keep their exact precision.
 - **`ACKOCTL_NO_VERSION_CHECK` accepts any truthy value.** It previously recognised only `=1`; `=true` — the boolean grammar already used by `ACKOCTL_INSECURE_SKIP_TLS` — was silently ignored. It now parses via `strconv.ParseBool`.
 
 ## [0.2.0] — 2026-05-15

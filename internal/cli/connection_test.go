@@ -63,8 +63,10 @@ func TestParseLabelsNilPassthrough(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // runConnectionCmd mirrors runAdminCmd: builds a root command, points it at the
-// httptest server via env, and forces JSON output unless a test overrides it.
-func runConnectionCmd(t *testing.T, srvURL string, args ...string) (string, string, error) {
+// httptest server via env, and forces JSON output. It owns all env setup —
+// including the optional context workspace — so call sites never have to set
+// ACKOCTL_* vars themselves and cannot create env-ordering coupling.
+func runConnectionCmd(t *testing.T, srvURL, workspace string, args ...string) (string, string, error) {
 	t.Helper()
 	root := NewRootCmd()
 	stdout := &bytes.Buffer{}
@@ -74,6 +76,9 @@ func runConnectionCmd(t *testing.T, srvURL string, args ...string) (string, stri
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("ACKOCTL_SERVER", srvURL)
 	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	if workspace != "" {
+		t.Setenv("ACKOCTL_WORKSPACE", workspace)
+	}
 	root.SetArgs(append([]string{"--output", "json"}, args...))
 	root.SetContext(context.Background())
 	err := root.Execute()
@@ -88,13 +93,12 @@ func TestConnectionListRoundTrip(t *testing.T) {
 		_, _ = w.Write([]byte(`[{"id":"c1","name":"Prod","hosts":["h1"],"port":3000,"workspaceId":"ws-1"}]`))
 	}))
 	t.Cleanup(srv.Close)
-	stdout, _, err := runConnectionCmd(t, srv.URL, "connection", "list")
+	stdout, _, err := runConnectionCmd(t, srv.URL, "", "connection", "list")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"name": "Prod"`)
 }
 
 func TestConnectionListPropagatesContextWorkspace(t *testing.T) {
-	t.Setenv("ACKOCTL_WORKSPACE", "ws-ctx")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "ws-ctx", r.URL.Query().Get("workspace_id"),
 			"list must scope to the context workspace, never fall back to all workspaces")
@@ -102,7 +106,7 @@ func TestConnectionListPropagatesContextWorkspace(t *testing.T) {
 		_, _ = w.Write([]byte(`[]`))
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL, "connection", "list")
+	_, _, err := runConnectionCmd(t, srv.URL, "ws-ctx", "connection", "list")
 	require.NoError(t, err)
 }
 
@@ -135,7 +139,7 @@ func TestConnectionGetRoundTrip(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"c1","name":"Prod","hosts":["h1"],"port":3000}`))
 	}))
 	t.Cleanup(srv.Close)
-	stdout, _, err := runConnectionCmd(t, srv.URL, "connection", "get", "c1")
+	stdout, _, err := runConnectionCmd(t, srv.URL, "", "connection", "get", "c1")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"id": "c1"`)
 }
@@ -151,7 +155,7 @@ func TestConnectionCreateRoundTrip(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"new","name":"Prod","hosts":["h1","h2"],"port":3000}`))
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL,
+	_, _, err := runConnectionCmd(t, srv.URL, "",
 		"connection", "create", "--name", "Prod",
 		"--host", "h1", "--host", "h2", "--port", "3000",
 	)
@@ -162,7 +166,6 @@ func TestConnectionCreateRoundTrip(t *testing.T) {
 }
 
 func TestConnectionCreatePropagatesContextWorkspace(t *testing.T) {
-	t.Setenv("ACKOCTL_WORKSPACE", "ws-ctx")
 	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
@@ -170,12 +173,12 @@ func TestConnectionCreatePropagatesContextWorkspace(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"new","name":"Prod","hosts":["h1"],"port":3000,"workspaceId":"ws-ctx"}`))
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL,
+	_, _, err := runConnectionCmd(t, srv.URL, "ws-ctx",
 		"connection", "create", "--name", "Prod", "--host", "h1",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, "ws-ctx", body["workspaceId"],
-		"create must scope the connection to the context workspace when --workspace is not given")
+		"create must scope the new connection to the context workspace when --workspace is not given")
 }
 
 func TestConnectionCreateParsesLabels(t *testing.T) {
@@ -186,7 +189,7 @@ func TestConnectionCreateParsesLabels(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"new","name":"Prod","hosts":["h1"],"port":3000}`))
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL,
+	_, _, err := runConnectionCmd(t, srv.URL, "",
 		"connection", "create", "--name", "Prod", "--host", "h1",
 		"--label", "env=prod", "--label", "team=core",
 	)
@@ -199,7 +202,7 @@ func TestConnectionCreateRejectsInvalidLabel(t *testing.T) {
 		t.Fatal("server should not be hit on a malformed --label")
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL,
+	_, _, err := runConnectionCmd(t, srv.URL, "",
 		"connection", "create", "--name", "Prod", "--host", "h1", "--label", "malformed",
 	)
 	require.Error(t, err)
@@ -211,7 +214,7 @@ func TestConnectionCreateRequiresName(t *testing.T) {
 		t.Fatal("server should not be hit when --name is missing")
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL, "connection", "create", "--host", "h1")
+	_, _, err := runConnectionCmd(t, srv.URL, "", "connection", "create", "--host", "h1")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required")
 }
@@ -226,13 +229,14 @@ func TestConnectionUpdateSendsOnlyChangedFields(t *testing.T) {
 		_, _ = w.Write([]byte(`{"id":"c1","name":"Prod","hosts":["h1"],"port":3000,"note":"updated"}`))
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL,
+	_, _, err := runConnectionCmd(t, srv.URL, "",
 		"connection", "update", "c1", "--note", "updated",
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "updated", body["note"])
-	assert.NotContains(t, body, "name", "unchanged flags must not be serialised into the PUT body")
-	assert.NotContains(t, body, "port")
+	// Only the flag the user actually changed may appear in the PUT body —
+	// an unset flag leaking through would silently overwrite a server-side
+	// field with a zero value.
+	assert.Equal(t, map[string]any{"note": "updated"}, body)
 }
 
 func TestConnectionDeleteRequiresYes(t *testing.T) {
@@ -240,7 +244,7 @@ func TestConnectionDeleteRequiresYes(t *testing.T) {
 		t.Fatal("server should not be hit without --yes")
 	}))
 	t.Cleanup(srv.Close)
-	_, _, err := runConnectionCmd(t, srv.URL, "connection", "delete", "c1")
+	_, _, err := runConnectionCmd(t, srv.URL, "", "connection", "delete", "c1")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--yes")
 }
@@ -252,7 +256,7 @@ func TestConnectionDeleteWithYes(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	t.Cleanup(srv.Close)
-	_, stderr, err := runConnectionCmd(t, srv.URL, "connection", "delete", "c1", "--yes")
+	_, stderr, err := runConnectionCmd(t, srv.URL, "", "connection", "delete", "c1", "--yes")
 	require.NoError(t, err)
 	assert.Contains(t, stderr, "Deleted connection")
 }
@@ -264,7 +268,7 @@ func TestConnectionHealthRoundTrip(t *testing.T) {
 		_, _ = w.Write([]byte(`{"connected":true,"nodeCount":3,"namespaceCount":1,"build":"8.1.0","edition":"Community"}`))
 	}))
 	t.Cleanup(srv.Close)
-	stdout, _, err := runConnectionCmd(t, srv.URL, "connection", "health", "c1")
+	stdout, _, err := runConnectionCmd(t, srv.URL, "", "connection", "health", "c1")
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"connected": true`)
 }

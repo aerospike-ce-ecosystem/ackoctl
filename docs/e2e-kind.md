@@ -88,7 +88,7 @@ kubectl logs ackoctl-install
 
 Expected output excerpt:
 ```
-ackoctl version 0.1.3
+ackoctl version 0.2.0
   os/arch: linux/arm64
 NAMESPACE  NAME         PHASE      NODES
 aerospike  testcluster  Completed  1
@@ -111,4 +111,4 @@ kubectl delete configmap ackoctl-install-test --ignore-not-found
 - `ackoctl config set-context` only configures the client; no in-cluster RBAC binding is needed because cluster-manager itself owns the Kubernetes API access. Auth (`--token` / `ACKOCTL_TOKEN`) is the cluster-manager bearer, not a K8s ServiceAccount token.
 - For namespaced commands you may need `--namespace`/`-N` rather than `-n` depending on the verb — see `ackoctl k8s cluster <verb> --help`.
 - The pod above does not need internet egress for `apt update` itself, only for `raw.githubusercontent.com` (install.sh) and `github.com` (release tarball). In air-gapped clusters mirror those two URLs into your internal registry/proxy.
-- Tested with: ACKO chart 1.3.1, K8s 1.35 (kind), ackoctl v0.1.3, arm64 host.
+- Tested with: ACKO chart 1.3.1, K8s 1.35 (kind), ackoctl v0.2.0, arm64 host.

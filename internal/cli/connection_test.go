@@ -110,6 +110,19 @@ func TestConnectionListPropagatesContextWorkspace(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestConnectionListVerboseEnvWorkspaceDoesNotClaimContextFallback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "ws-env", r.URL.Query().Get("workspace_id"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(srv.Close)
+	_, stderr, err := runConnectionCmd(t, srv.URL, "ws-env", "--verbose", "connection", "list")
+	require.NoError(t, err)
+	assert.NotContains(t, stderr, "from current context")
+	assert.NotContains(t, stderr, "set --workspace to override")
+}
+
 func TestConnectionListTableShowsNoteColumn(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -179,6 +192,23 @@ func TestConnectionCreatePropagatesContextWorkspace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ws-ctx", body["workspaceId"],
 		"create must scope the new connection to the context workspace when --workspace is not given")
+}
+
+func TestConnectionCreateVerboseEnvWorkspaceDoesNotClaimContextFallback(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"new","name":"Prod","hosts":["h1"],"port":3000,"workspaceId":"ws-env"}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, stderr, err := runConnectionCmd(t, srv.URL, "ws-env",
+		"--verbose", "connection", "create", "--name", "Prod", "--host", "h1",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "ws-env", body["workspaceId"])
+	assert.NotContains(t, stderr, "from context")
+	assert.NotContains(t, stderr, "set --workspace to override")
 }
 
 func TestConnectionCreateParsesLabels(t *testing.T) {

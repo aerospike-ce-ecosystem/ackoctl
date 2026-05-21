@@ -126,7 +126,7 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if req.WorkspaceID == "" && c.Workspace != "" && global.Verbose {
+			if req.WorkspaceID == "" && c.Workspace != "" && global.Verbose && !global.WorkspaceSupplied() {
 				fmt.Fprintf(cmd.ErrOrStderr(), "ackoctl: creating connection in workspace=%s (from context; set --workspace to override)\n", c.Workspace)
 			}
 			conn, err := c.CreateConnection(cmd.Context(), req)

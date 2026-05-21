@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 
+	"github.com/aerospike-ce-ecosystem/ackoctl/internal/config"
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/output"
 )
 
@@ -22,11 +25,16 @@ type GlobalFlags struct {
 	NoVersionCheck          bool
 	ContextExplicit         bool
 	WorkspaceExplicit       bool
+	WorkspaceEnvExplicit    bool
 	InsecureSkipTLSExplicit bool
 }
 
 func (g *GlobalFlags) Format() (output.Format, error) {
 	return output.Parse(g.OutputFormat)
+}
+
+func (g *GlobalFlags) WorkspaceSupplied() bool {
+	return g.WorkspaceExplicit || g.WorkspaceEnvExplicit
 }
 
 func NewRootCmd() *cobra.Command {
@@ -47,6 +55,7 @@ go through cluster-manager's /api/* surface.`,
 			f := c.Flags()
 			flags.ContextExplicit = f.Changed("context")
 			flags.WorkspaceExplicit = f.Changed("workspace")
+			flags.WorkspaceEnvExplicit = os.Getenv(config.EnvWorkspace) != ""
 			flags.InsecureSkipTLSExplicit = f.Changed("insecure-skip-tls")
 			runVersionCheck(c, flags.NoVersionCheck)
 			return nil

@@ -217,6 +217,24 @@ ackoctl note record delete <CONN_ID> --namespace=test --set=users --pk=alice --y
 
 ---
 
+## guide — operational guides (org/team policy)
+
+Guides are workspace-scoped Markdown policy documents managed in cluster-manager. Each workspace has a **data-plane** guide (policy for Aerospike data CRUD) and a **control-plane** guide (policy for cluster lifecycle). Read the relevant guide **before** running data or cluster operations so your changes follow the org/team policy. This command is read-only — guides are authored by acko administrators in the cluster-manager web UI.
+
+The workspace comes from `--workspace` or the current context; when neither is set it falls back to the built-in `ws-default` workspace.
+
+```bash
+ackoctl guide list                              # both guides registered for the workspace
+ackoctl guide get data-plane                    # prints the Markdown body (read before record/set/query writes)
+ackoctl guide get control-plane                 # read before creating/scaling/deleting clusters
+ackoctl guide get data-plane --workspace=ws-team-a
+ackoctl guide get control-plane -o json         # structured: title, timestamps, author
+```
+
+`guide get` prints the raw Markdown to stdout under the default output so it reads naturally and pipes cleanly; `-o json` / `-o yaml` emit the full structured guide.
+
+---
+
 ## udf — Lua user-defined functions
 
 Only Lua is supported on Aerospike CE. Requests pass through cluster-manager's `/api/v1/udfs` surface (single JSON `{"filename":..., "content":<source>}` body, not multipart).

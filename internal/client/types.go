@@ -472,3 +472,24 @@ type ExecuteInfoRequest struct {
 type ExecuteInfoResponse struct {
 	Results []InfoCommandResult `json:"results"`
 }
+
+// Guide mirrors cluster-manager's GuideResponse — a workspace-scoped Markdown
+// operational policy document. Guides live in cluster-manager's metaDB, not in
+// Aerospike. “GuideType“ is “"data-plane"“ or “"control-plane"“.
+// “UpdatedBy“ is the OIDC “sub“ of the most recent writer, or “"system"“
+// under bearer-token / anonymous auth.
+type Guide struct {
+	WorkspaceID string `json:"workspaceId"`
+	GuideType   string `json:"guideType"`
+	Title       string `json:"title"`
+	Content     string `json:"content"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+	UpdatedBy   string `json:"updatedBy,omitempty"`
+}
+
+// GuidesListResponse mirrors the “{"guides": [...]}“ envelope returned by
+// “GET /guides/{workspace_id}“.
+type GuidesListResponse struct {
+	Guides []Guide `json:"guides"`
+}

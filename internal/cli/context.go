@@ -58,7 +58,7 @@ func newClient(cmd *cobra.Command, global *GlobalFlags) (*client.BaseClient, err
 	}
 	// Surface workspace fallback so users notice when an ACL is silently
 	// scoping their request to the current context's workspace.
-	if !global.WorkspaceExplicit && ctx.WorkspaceID != "" {
+	if !global.WorkspaceSupplied() && ctx.WorkspaceID != "" {
 		warnWorkspaceFallback(cmd.ErrOrStderr(), global.Verbose, ctx.WorkspaceID)
 	}
 	return c, nil

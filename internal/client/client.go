@@ -208,9 +208,17 @@ func summarizeContentType(ct string) string {
 	return ct
 }
 
+// truncate shortens s to at most n runes, appending an ellipsis when it cuts.
+// It slices on rune (not byte) boundaries so a multibyte UTF-8 error body —
+// e.g. a non-English proxy page — is never sliced mid-codepoint into a
+// replacement-char glitch.
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	if n < 0 {
+		n = 0
+	}
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	return string(runes[:n]) + "..."
 }

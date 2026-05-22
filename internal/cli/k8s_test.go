@@ -1,6 +1,10 @@
 package cli
 
 import (
+	"bytes"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -149,4 +153,65 @@ func TestSinceFlagToSecondsAt24h(t *testing.T) {
 	got, err := sinceFlagToSeconds(24 * time.Hour)
 	require.NoError(t, err)
 	assert.Equal(t, 86400, got, "boundary value should be accepted")
+}
+
+// When the scale GET response carries no resolvable "size" key, the scale-down
+// guard must NOT be skipped — it must require --yes (treat "cannot confirm
+// current size" as "must confirm"). Without --yes the scale POST must not fire.
+func TestK8sClusterScaleRequiresYesWhenCurrentSizeUnresolvable(t *testing.T) {
+	scalePosted := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			// No "size" key — node count nested elsewhere; intField returns ok=false.
+			_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Completed","spec":{"size":5}}`))
+			return
+		}
+		scalePosted = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Scaling","size":2}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs([]string{"k8s", "cluster", "scale", "ns/c1", "--size", "2"})
+	root.SetContext(context.Background())
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot determine current cluster size")
+	assert.False(t, scalePosted, "scale must not be POSTed when current size is unconfirmed and --yes is absent")
+}
+
+// With --yes supplied, an unresolvable current size no longer blocks the scale.
+func TestK8sClusterScaleProceedsWhenUnresolvableButYesGiven(t *testing.T) {
+	scalePosted := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Completed","spec":{"size":5}}`))
+			return
+		}
+		scalePosted = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Scaling","size":2}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs([]string{"k8s", "cluster", "scale", "ns/c1", "--size", "2", "--yes"})
+	root.SetContext(context.Background())
+
+	require.NoError(t, root.Execute())
+	assert.True(t, scalePosted, "--yes must allow the scale to proceed despite an unconfirmed current size")
 }

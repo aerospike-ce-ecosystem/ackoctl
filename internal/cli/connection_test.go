@@ -52,6 +52,14 @@ func TestParseLabelsRejectsMissingEquals(t *testing.T) {
 	assert.Contains(t, err.Error(), "expected key=value")
 }
 
+func TestParseLabelsRejectsEmptyKey(t *testing.T) {
+	// strings.Cut("=prod", "=") returns key="", ok=true — without an explicit
+	// guard this would silently insert an unnamed label.
+	_, err := parseLabels([]string{"=prod"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "key must not be empty")
+}
+
 func TestParseLabelsNilPassthrough(t *testing.T) {
 	got, err := parseLabels(nil)
 	require.NoError(t, err)

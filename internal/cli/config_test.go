@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -58,6 +59,30 @@ func TestConfigLifecycle(t *testing.T) {
 	out, _, err = runRoot(t, cfgPath, "config", "view", "-o", "json")
 	require.NoError(t, err)
 	assert.NotContains(t, out, `"name": "prod"`)
+}
+
+func TestConfigViewRedactsToken(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+
+	_, _, err := runRoot(t, cfgPath, "config", "set-context", "prod",
+		"--server", "https://acm.example.com/api",
+		"--token", "super-secret-token",
+	)
+	require.NoError(t, err)
+
+	// json and yaml views must never print the real token.
+	for _, format := range []string{"json", "yaml"} {
+		out, _, err := runRoot(t, cfgPath, "config", "view", "-o", format)
+		require.NoError(t, err)
+		assert.NotContains(t, out, "super-secret-token", "%s view leaked the token", format)
+		assert.Contains(t, out, "***", "%s view should show the redaction placeholder", format)
+	}
+
+	// The on-disk config file must still carry the real token.
+	raw, err := os.ReadFile(cfgPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(raw), "super-secret-token",
+		"redaction must not alter the persisted config file")
 }
 
 func TestSetContextRequiresServerOnCreate(t *testing.T) {

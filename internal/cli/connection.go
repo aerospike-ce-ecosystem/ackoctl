@@ -318,6 +318,11 @@ func parseLabels(pairs []string) (map[string]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("invalid label %q (expected key=value)", p)
 		}
+		// strings.Cut("=value", "=") yields an empty key with ok=true; reject
+		// it explicitly so a label like "=prod" cannot land an unnamed entry.
+		if k == "" {
+			return nil, fmt.Errorf("invalid label %q: key must not be empty", p)
+		}
 		out[k] = v
 	}
 	return out, nil

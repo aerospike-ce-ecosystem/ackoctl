@@ -119,6 +119,57 @@ func TestDownloadAndExtractChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestExtractBinaryRejectsOversizedEntry(t *testing.T) {
+	// A tar entry larger than maxBinarySize must be rejected rather than
+	// extracted, so a corrupt or malicious archive cannot exhaust disk.
+	oversized := bytes.Repeat([]byte{0x41}, maxBinarySize+1)
+	archive := buildArchive(t, oversized)
+
+	dir := t.TempDir()
+	archivePath := filepath.Join(dir, "archive.tar.gz")
+	if err := os.WriteFile(archivePath, archive, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, BinaryName)
+
+	err := extractBinary(archivePath, dst)
+	if err == nil {
+		t.Fatal("expected error for oversized binary, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error = %v, want size-limit error", err)
+	}
+	// The partially written destination must not be left behind.
+	if _, statErr := os.Stat(dst); !os.IsNotExist(statErr) {
+		t.Errorf("oversized extraction left %s on disk", dst)
+	}
+}
+
+func TestExtractBinaryAcceptsSizeAtLimit(t *testing.T) {
+	// An entry exactly at maxBinarySize is within bounds and must extract
+	// cleanly — the cap rejects only strictly larger entries.
+	body := bytes.Repeat([]byte{0x42}, 1<<20) // 1 MiB, comfortably under cap
+	archive := buildArchive(t, body)
+
+	dir := t.TempDir()
+	archivePath := filepath.Join(dir, "archive.tar.gz")
+	if err := os.WriteFile(archivePath, archive, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, BinaryName)
+
+	if err := extractBinary(archivePath, dst); err != nil {
+		t.Fatalf("extractBinary: %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, body) {
+		t.Errorf("extracted content mismatch: got %d bytes, want %d", len(got), len(body))
+	}
+}
+
 func TestReplaceSameFs(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "new")

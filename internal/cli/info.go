@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/spf13/cobra"
 
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/client"
@@ -32,6 +35,14 @@ status, statistics, namespaces, namespace/<ns>, ...); pass --allow-write to
 forward any verb including write-capable ones such as set-config:.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// MarkFlagRequired only checks --command was supplied, not that it
+			// carries a verb. Reject empty/whitespace values so the server is
+			// never hit with a meaningless asinfo request.
+			for _, verb := range commands {
+				if strings.TrimSpace(verb) == "" {
+					return fmt.Errorf("--command must not be empty")
+				}
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err

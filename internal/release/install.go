@@ -25,6 +25,12 @@ const BinaryName = "ackoctl"
 // still bounded so a stalled connection cannot hang the upgrade forever.
 const downloadTimeout = 5 * time.Minute
 
+// maxBinarySize caps how many bytes extractBinary will copy out of a tar
+// entry. 200 MiB is comfortably above any realistic ackoctl binary while
+// still bounding a maliciously crafted or corrupt archive so extraction
+// cannot exhaust disk.
+const maxBinarySize = 200 << 20 // 200 MiB
+
 // DownloadAndExtract pulls the archive for tag/goos/goarch, verifies its
 // sha256 against the matching checksums.txt entry, untars the embedded
 // `ackoctl` binary into dstDir, and returns the on-disk path of the
@@ -242,9 +248,18 @@ func extractBinary(archivePath, dst string) error {
 		if err != nil {
 			return fmt.Errorf("create extracted binary: %w", err)
 		}
-		if _, err := io.Copy(out, tr); err != nil {
+		// Cap extraction at maxBinarySize. LimitReader yields at most
+		// maxBinarySize+1 bytes; if the copy reaches exactly that, the entry
+		// is larger than the cap and we reject it rather than writing on.
+		n, err := io.Copy(out, io.LimitReader(tr, maxBinarySize+1))
+		if err != nil {
 			out.Close()
 			return fmt.Errorf("write extracted binary: %w", err)
+		}
+		if n > maxBinarySize {
+			out.Close()
+			os.Remove(dst)
+			return fmt.Errorf("extracted binary exceeds %d byte limit", maxBinarySize)
 		}
 		return out.Close()
 	}

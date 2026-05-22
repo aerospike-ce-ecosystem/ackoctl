@@ -31,6 +31,26 @@ func resolveConfigPath(global *GlobalFlags) (string, error) {
 	return config.DefaultPath()
 }
 
+// redactedToken is the placeholder substituted for a non-empty bearer token
+// in `config view` output so credentials never reach the terminal or a piped
+// json/yaml consumer.
+const redactedToken = "***"
+
+// redactConfigTokens returns a shallow copy of cfg with every non-empty
+// context Token replaced by redactedToken. The input config is not mutated,
+// so the on-disk file written by config.Save still carries the real token.
+func redactConfigTokens(cfg *config.Config) *config.Config {
+	out := *cfg
+	out.Contexts = make([]config.Context, len(cfg.Contexts))
+	for i, c := range cfg.Contexts {
+		if c.Token != "" {
+			c.Token = redactedToken
+		}
+		out.Contexts[i] = c
+	}
+	return &out
+}
+
 func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
@@ -48,6 +68,11 @@ func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Redact bearer tokens before marshaling. The table view never
+			// prints the token, but -o json / -o yaml would otherwise expose
+			// it in plaintext. This only affects displayed output — the
+			// on-disk config file written by config.Save is untouched.
+			cfg = redactConfigTokens(cfg)
 			return output.Print(cmd.OutOrStdout(), format, cfg,
 				output.WithTable(
 					[]string{"CURRENT", "NAME", "SERVER", "WORKSPACE"},

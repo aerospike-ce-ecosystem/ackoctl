@@ -170,6 +170,50 @@ func TestExtractBinaryAcceptsSizeAtLimit(t *testing.T) {
 	}
 }
 
+// Regression: when io.Copy fails partway through extraction, extractBinary
+// must remove the partially written destination file rather than leaving a
+// corrupt binary behind — mirroring the size-limit rejection path.
+func TestExtractBinaryRemovesPartialFileOnCopyError(t *testing.T) {
+	// Build a tar.gz whose tar header claims a larger Size than the bytes
+	// actually present, then truncate the gzip stream. tar.Reader.Next
+	// succeeds on the header, but io.Copy of the entry body hits an
+	// unexpected EOF — exactly the mid-copy failure we need.
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{
+		Name:     BinaryName,
+		Mode:     0o755,
+		Size:     4096, // claim 4 KiB...
+		Typeflag: tar.TypeReg,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write([]byte("short")); err != nil { // ...but write only 5 bytes
+		t.Fatal(err)
+	}
+	// Deliberately do NOT call tw.Close()/gz.Close() cleanly — flush what we
+	// have and truncate, so the entry body is incomplete.
+	_ = gz.Flush()
+	truncated := buf.Bytes()
+
+	dir := t.TempDir()
+	archivePath := filepath.Join(dir, "archive.tar.gz")
+	if err := os.WriteFile(archivePath, truncated, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dst := filepath.Join(dir, BinaryName)
+
+	err := extractBinary(archivePath, dst)
+	if err == nil {
+		t.Fatal("expected error from truncated archive, got nil")
+	}
+	// The partially written destination must not be left behind.
+	if _, statErr := os.Stat(dst); !os.IsNotExist(statErr) {
+		t.Errorf("failed extraction left %s on disk", dst)
+	}
+}
+
 func TestReplaceSameFs(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "new")

@@ -95,12 +95,16 @@ Namespaces cannot be created at runtime — they must be defined in aerospike.co
 			if msg == "" {
 				msg = "applied (server returned no message)"
 			}
-			fmt.Fprintln(cmd.OutOrStdout(), msg)
+			fmt.Fprintln(cmd.ErrOrStderr(), msg)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&nsName, "name", "", "namespace name (required)")
-	cmd.Flags().StringSliceVar(&params, "param", nil, "runtime-tunable parameter as key=value (repeatable)")
+	// StringArrayVar (not StringSliceVar) so commas inside parameter values are
+	// preserved verbatim. Runtime-tunable values such as
+	// "storage-engine=device,/dev/sda" contain commas that StringSliceVar would
+	// otherwise split into pieces, failing the key=value check below.
+	cmd.Flags().StringArrayVar(&params, "param", nil, "runtime-tunable parameter as key=value (repeatable)")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }

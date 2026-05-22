@@ -128,7 +128,7 @@ func writeTable(w io.Writer, data any, cfg options) error {
 			items = cfg.rows(data)
 		}
 		for _, item := range items {
-			fmt.Fprintln(tw, strings.Join(cfg.row(item), "\t"))
+			fmt.Fprintln(tw, strings.Join(sanitizeCells(cfg.row(item)), "\t"))
 		}
 		return tw.Flush()
 	}
@@ -139,6 +139,56 @@ func writeTable(w io.Writer, data any, cfg options) error {
 		return err
 	}
 	return tw.Flush()
+}
+
+// sanitizeCells applies sanitizeCell to every cell in a table row.
+func sanitizeCells(cells []string) []string {
+	out := make([]string, len(cells))
+	for i, c := range cells {
+		out[i] = sanitizeCell(c)
+	}
+	return out
+}
+
+// sanitizeCell makes a string safe to place in a tabwriter cell. A raw '\n'
+// would end the row early and a raw '\t' would inject a spurious column, both
+// of which shift every following column out of alignment — a real hazard for
+// cells carrying free-form server text such as Kubernetes event messages or
+// multi-line asinfo output. Each run of control whitespace (tab, newline,
+// carriage return, vertical tab, form feed) collapses to a single space; other
+// non-printable control characters are dropped so a stray byte cannot corrupt
+// the terminal. Ordinary content is returned unchanged.
+func sanitizeCell(s string) string {
+	if !strings.ContainsFunc(s, isUnsafeCellRune) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	prevSpace := false
+	for _, r := range s {
+		switch {
+		case r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f':
+			if !prevSpace {
+				b.WriteByte(' ')
+				prevSpace = true
+			}
+		case r != ' ' && (r < 0x20 || r == 0x7f):
+			// Drop other control characters (e.g. NUL, ESC) entirely.
+		default:
+			b.WriteRune(r)
+			prevSpace = false
+		}
+	}
+	return b.String()
+}
+
+// isUnsafeCellRune reports whether r would corrupt tabwriter layout or the
+// terminal if emitted verbatim in a table cell.
+func isUnsafeCellRune(r rune) bool {
+	if r == ' ' {
+		return false
+	}
+	return r < 0x20 || r == 0x7f
 }
 
 func writeKeyValue(w io.Writer, prefix string, v any) error {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const (
@@ -46,6 +47,10 @@ type Client struct {
 func New() *Client {
 	return &Client{
 		HTTP: &http.Client{
+			// Bound the latest-tag round-trip so a stalled connection cannot
+			// hang `ackoctl upgrade` or the startup version-check forever.
+			// Consistent with internal/client and install.go's download timeout.
+			Timeout: 30 * time.Second,
 			CheckRedirect: func(*http.Request, []*http.Request) error {
 				return http.ErrUseLastResponse
 			},

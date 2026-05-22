@@ -64,13 +64,15 @@ func WriteCache(path string, v *VersionCheck) error {
 		return err
 	}
 	tmpName := tmp.Name()
+	// Clean up the temp file on every path. After a successful os.Rename the
+	// temp name no longer exists, so the deferred Remove is a harmless no-op;
+	// on any error path (including a failed rename) it prevents a leak.
+	defer os.Remove(tmpName)
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		os.Remove(tmpName)
 		return err
 	}
 	if err := tmp.Close(); err != nil {
-		os.Remove(tmpName)
 		return err
 	}
 	return os.Rename(tmpName, path)

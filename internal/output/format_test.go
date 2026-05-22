@@ -142,6 +142,82 @@ func TestPrintTableExplicit(t *testing.T) {
 	assert.Contains(t, lines[2], "b")
 }
 
+// TestSanitizeCell guards the table-cell sanitizer against control characters
+// that would otherwise corrupt tabwriter layout or the terminal.
+func TestSanitizeCell(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain text untouched", "hello world", "hello world"},
+		{"empty stays empty", "", ""},
+		{"newline becomes space", "line1\nline2", "line1 line2"},
+		{"tab becomes space", "a\tb", "a b"},
+		{"carriage return becomes space", "a\r\nb", "a b"},
+		{"run of control whitespace collapses to one space", "a\n\n\t\tb", "a b"},
+		{"regular spaces preserved, not collapsed", "a   b", "a   b"},
+		{"control run adjacent to regular spaces", "a \n b", "a   b"},
+		{"leading newline collapses to single space", "\nbody", " body"},
+		{"vertical tab and form feed", "a\vb\fc", "a b c"},
+		{"NUL and ESC dropped", "a\x00b\x1bc", "abc"},
+		{"DEL dropped", "a\x7fb", "ab"},
+		{"unicode preserved", "한국어 값", "한국어 값"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, sanitizeCell(tc.in))
+		})
+	}
+}
+
+type eventRow struct {
+	Reason  string
+	Message string
+	Count   int
+}
+
+// TestPrintTableSanitizesCells is the regression guard: a multi-line value in
+// one cell (e.g. a Kubernetes event message or asinfo output) must not push
+// later columns onto a new line or shift them out of alignment. Every data row
+// must stay on exactly one physical line with every column present.
+func TestPrintTableSanitizesCells(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []eventRow{
+		{Reason: "Unhealthy", Message: "node failed\n\tretrying soon", Count: 3},
+		{Reason: "Scaled", Message: "ok", Count: 1},
+	}
+	err := Print(&buf, FormatTable, rows,
+		WithTable(
+			[]string{"REASON", "MESSAGE", "COUNT"},
+			func(v any) []string {
+				r := v.(eventRow)
+				return []string{r.Reason, r.Message, strconv.Itoa(r.Count)}
+			},
+			func(v any) []any {
+				out := []any{}
+				for _, r := range v.([]eventRow) {
+					out = append(out, r)
+				}
+				return out
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	// Header + exactly two data rows — the embedded newline must NOT have
+	// split the first row across two physical lines.
+	require.Len(t, lines, 3)
+	assert.Contains(t, lines[0], "REASON")
+	// The first data row keeps its trailing COUNT column on the same line.
+	assert.Contains(t, lines[1], "Unhealthy")
+	assert.Contains(t, lines[1], "node failed retrying soon")
+	assert.Contains(t, lines[1], "3")
+	assert.Contains(t, lines[2], "Scaled")
+	assert.Contains(t, lines[2], "1")
+}
+
 func TestPrintTableFallback(t *testing.T) {
 	var buf bytes.Buffer
 	require.NoError(t, Print(&buf, FormatTable, sampleConn{Name: "x", Host: "y", Port: 9}))

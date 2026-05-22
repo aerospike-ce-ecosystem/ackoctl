@@ -133,7 +133,16 @@ func (c *BaseClient) Do(ctx context.Context, method, path string, body any, quer
 		// a zero-value struct.
 		return fmt.Errorf("cluster-manager %d: empty body where a JSON object was expected", resp.StatusCode)
 	}
-	if err := json.Unmarshal(raw, out); err != nil {
+	// Decode with UseNumber so JSON numbers that land in a map[string]any
+	// target (raw-map responses like ClusterInfo / K8sCluster) keep their
+	// exact textual form instead of being routed through float64. Without
+	// this, an Aerospike object count or memory byte count above 2^53 loses
+	// precision, and even ordinary large integers render as "4e+09" in table
+	// output. Typed structs are unaffected — json.Number coerces into int /
+	// int64 / string fields exactly as a plain unmarshal would.
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.UseNumber()
+	if err := dec.Decode(out); err != nil {
 		return fmt.Errorf("decode response: %w (body=%s)", err, truncate(string(raw), 200))
 	}
 	return nil

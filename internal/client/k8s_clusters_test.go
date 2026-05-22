@@ -26,7 +26,11 @@ func TestScaleK8sClusterRoundTrip(t *testing.T) {
 	// The wire field is "size" per the FastAPI ScaleK8sClusterRequest model.
 	assert.EqualValues(t, 5, seenBody["size"])
 	assert.Equal(t, "Scaling", out["phase"])
-	assert.EqualValues(t, 5, out["size"])
+	// K8sCluster is a raw map decoded with json.Decoder.UseNumber, so numeric
+	// fields arrive as json.Number (exact, no float64 precision loss).
+	size, ok := out["size"].(json.Number)
+	require.True(t, ok, "expected json.Number, got %T", out["size"])
+	assert.Equal(t, "5", size.String())
 }
 
 func TestScaleK8sClusterSurfacesServerValidationError(t *testing.T) {

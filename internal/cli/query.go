@@ -57,6 +57,12 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 				if bin == "" || op == "" {
 					return fmt.Errorf("--bin and --op are required together when building a predicate")
 				}
+				// Reject an unknown operator client-side so a typo fails fast
+				// instead of round-tripping to a server 422 after the request
+				// has already been assembled.
+				if err := validateQueryOp(op); err != nil {
+					return err
+				}
 				// Every supported operator (equals, between, contains, geo_*)
 				// needs at least one operand, so --value is always required.
 				if valueRaw == "" {

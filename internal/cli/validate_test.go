@@ -48,3 +48,31 @@ func TestValidatePortRejectsOutOfRange(t *testing.T) {
 		assert.Contains(t, err.Error(), "between 1 and 65535")
 	}
 }
+
+func TestValidateQueryOpAccepted(t *testing.T) {
+	for _, v := range []string{"", "equals", "between", "contains", "geo_within_region", "geo_contains_point"} {
+		require.NoError(t, validateQueryOp(v), "op %q should be accepted", v)
+	}
+}
+
+func TestValidateQueryOpRejectsUnknown(t *testing.T) {
+	for _, v := range []string{"equal", "EQUALS", "eq", "geo", "in"} {
+		err := validateQueryOp(v)
+		require.Error(t, err, "op %q should be rejected", v)
+		assert.Contains(t, err.Error(), "equals|between|contains|geo_within_region|geo_contains_point")
+	}
+}
+
+func TestValidatePKMatchModeAccepted(t *testing.T) {
+	for _, v := range []string{"", "exact", "prefix", "regex"} {
+		require.NoError(t, validatePKMatchMode(v), "pk-match-mode %q should be accepted", v)
+	}
+}
+
+func TestValidatePKMatchModeRejectsUnknown(t *testing.T) {
+	for _, v := range []string{"prefex", "Exact", "glob", "substring"} {
+		err := validatePKMatchMode(v)
+		require.Error(t, err, "pk-match-mode %q should be rejected", v)
+		assert.Contains(t, err.Error(), "exact|prefix|regex")
+	}
+}

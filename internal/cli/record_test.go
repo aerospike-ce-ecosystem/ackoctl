@@ -143,3 +143,16 @@ func TestRecordDeleteRejectsUnknownPKType(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "auto|string|int|bytes")
 }
+
+func TestRecordQueryRejectsUnknownPKMatchMode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --pk-match-mode is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "query", "conn-1",
+		"--namespace", "test", "--pk-pattern", "user-", "--pk-match-mode", "prefex",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exact|prefix|regex")
+}

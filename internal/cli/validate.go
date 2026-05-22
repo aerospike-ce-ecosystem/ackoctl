@@ -37,3 +37,31 @@ func validatePort(port int) error {
 	}
 	return nil
 }
+
+// validateQueryOp rejects a `query exec --op` value that is not one of the
+// predicate operators cluster-manager accepts. An empty string means "no
+// predicate" and is handled by the caller, so it is allowed here. Without this
+// check a typo such as `--op equal` round-trips to the server and surfaces as
+// an opaque 422 only after the query request has been fully assembled.
+func validateQueryOp(op string) error {
+	switch op {
+	case "", "equals", "between", "contains", "geo_within_region", "geo_contains_point":
+		return nil
+	default:
+		return fmt.Errorf("--op must be one of equals|between|contains|geo_within_region|geo_contains_point, got %q", op)
+	}
+}
+
+// validatePKMatchMode rejects a `record query --pk-match-mode` value that is
+// not one of the modes cluster-manager accepts. An empty string means "not
+// supplied" and is allowed — the server defaults it to "exact". Without this
+// check a typo such as `--pk-match-mode prefex` round-trips to the server and
+// surfaces as an opaque 422.
+func validatePKMatchMode(mode string) error {
+	switch mode {
+	case "", "exact", "prefix", "regex":
+		return nil
+	default:
+		return fmt.Errorf("--pk-match-mode must be one of exact|prefix|regex, got %q", mode)
+	}
+}

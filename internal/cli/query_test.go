@@ -204,3 +204,16 @@ func TestQueryExecRejectsUnknownPKType(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "auto|string|int|bytes")
 }
+
+func TestQueryExecRejectsUnknownOp(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --op is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "equal", "--value", "30",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "equals|between|contains|geo_within_region|geo_contains_point")
+}

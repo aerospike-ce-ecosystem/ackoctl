@@ -278,6 +278,9 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
+			if err := validatePKMatchMode(pkMatchMode); err != nil {
+				return err
+			}
 			req := client.FilteredQueryRequest{
 				Namespace:   namespace,
 				Set:         set,

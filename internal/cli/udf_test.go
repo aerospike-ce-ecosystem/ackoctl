@@ -260,3 +260,17 @@ func TestUdfUploadRejectsDirectory(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "directory")
 }
+
+func TestUdfRemoveRejectsEmptyFilename(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --filename is empty")
+	}))
+	t.Cleanup(srv.Close)
+	for _, name := range []string{"", "   "} {
+		_, _, err := runUdfCmd(t, srv.URL,
+			"udf", "remove", "conn-1", "--filename", name, "--yes",
+		)
+		require.Error(t, err, "filename %q should be rejected", name)
+		assert.Contains(t, err.Error(), "--filename must not be empty")
+	}
+}

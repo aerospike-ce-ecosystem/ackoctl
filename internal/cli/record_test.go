@@ -74,3 +74,44 @@ func TestRecordDeleteBinRequiresBin(t *testing.T) {
 	// cobra reports missing required flag(s)
 	assert.Contains(t, err.Error(), "required")
 }
+
+func TestRecordListRejectsOutOfRangePageSize(t *testing.T) {
+	for _, pageSize := range []string{"0", "501", "-1"} {
+		t.Run("pageSize="+pageSize, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --page-size is out of range")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "list", "conn-1",
+				"--namespace", "test", "--page-size", pageSize,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--page-size must be between 1 and 500")
+		})
+	}
+}
+
+func TestRecordQueryRejectsOutOfRangePagination(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"page=0", []string{"--page", "0"}, "--page must be 1 or greater"},
+		{"pageSize=501", []string{"--page-size", "501"}, "--page-size must be between 1 and 500"},
+		{"maxRecords=-1", []string{"--max-records", "-1"}, "--max-records must not be negative"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when pagination flags are out of range")
+			}))
+			t.Cleanup(srv.Close)
+			args := append([]string{"record", "query", "conn-1", "--namespace", "test"}, tc.args...)
+			_, _, err := runRecordCmd(t, srv.URL, args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}

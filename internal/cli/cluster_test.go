@@ -73,3 +73,28 @@ func TestClusterConfigureNamespaceRejectsReservedParam(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name=... is reserved")
 }
+
+func TestClusterConfigureNamespaceRejectsEmptyParamKey(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when client guard rejects the input")
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	// "=90" splits into an empty key with ok=true; it must be rejected so an
+	// unnamed entry never lands in the request body.
+	root.SetArgs([]string{
+		"cluster", "configure-namespace", "conn-1",
+		"--name", "test",
+		"--param", "=90",
+	})
+	root.SetContext(context.Background())
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "key must not be empty")
+}

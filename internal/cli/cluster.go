@@ -73,6 +73,12 @@ Namespaces cannot be created at runtime — they must be defined in aerospike.co
 				if !ok {
 					return fmt.Errorf("invalid --param %q (expected key=value)", p)
 				}
+				// strings.Cut("=value", "=") yields an empty key with ok=true;
+				// reject it explicitly so a param like "=90" cannot land an
+				// unnamed entry the server then rejects with a confusing 422.
+				if k == "" {
+					return fmt.Errorf("invalid --param %q: key must not be empty", p)
+				}
 				if k == "name" {
 					return fmt.Errorf("--param name=... is reserved; use --name to set the namespace")
 				}

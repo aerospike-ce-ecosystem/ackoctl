@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,6 +40,21 @@ func TestIntFieldNilValue(t *testing.T) {
 func TestIntFieldUnexpectedType(t *testing.T) {
 	_, ok := intField(map[string]any{"size": "five"}, "size")
 	assert.False(t, ok, "string value should not be coerced to int")
+}
+
+// TestIntFieldFromJSONNumber covers the real-world decode path: the REST
+// client decodes raw-map responses with json.Decoder.UseNumber, so a K8sCluster
+// "size" field arrives as json.Number. Without this case the scale-down safety
+// guard would lose the current node count and misbehave.
+func TestIntFieldFromJSONNumber(t *testing.T) {
+	v, ok := intField(map[string]any{"size": json.Number("7")}, "size")
+	assert.True(t, ok)
+	assert.Equal(t, 7, v)
+}
+
+func TestIntFieldFromNonIntegerJSONNumber(t *testing.T) {
+	_, ok := intField(map[string]any{"size": json.Number("3.5")}, "size")
+	assert.False(t, ok, "a non-integer json.Number must not coerce to int")
 }
 
 func TestFilterEventsSinceZeroReturnsAll(t *testing.T) {
@@ -186,6 +202,42 @@ func TestK8sClusterScaleRequiresYesWhenCurrentSizeUnresolvable(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "cannot determine current cluster size")
 	assert.False(t, scalePosted, "scale must not be POSTed when current size is unconfirmed and --yes is absent")
+}
+
+// When the scale GET response carries a top-level "size", the scale-down guard
+// must read it and refuse a shrink without --yes. This exercises the real
+// decode path: the REST client decodes the raw K8sCluster map with
+// json.Decoder.UseNumber, so "size" reaches intField as a json.Number. The
+// guard would silently degrade to "cannot determine current size" if intField
+// did not handle that type.
+func TestK8sClusterScaleRefusesScaleDownFromTopLevelSize(t *testing.T) {
+	scalePosted := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			// Top-level "size": 5 — current node count is resolvable.
+			_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Completed","size":5}`))
+			return
+		}
+		scalePosted = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Scaling","size":2}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs([]string{"k8s", "cluster", "scale", "ns/c1", "--size", "2"})
+	root.SetContext(context.Background())
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "refusing scale-down 5 -> 2")
+	assert.False(t, scalePosted, "scale-down must not be POSTed without --yes")
 }
 
 // With --yes supplied, an unresolvable current size no longer blocks the scale.

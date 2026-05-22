@@ -157,6 +157,31 @@ func TestClusterInfoReturnsRawMap(t *testing.T) {
 	assert.Equal(t, []any{"test"}, info["namespaces"])
 }
 
+// TestDoPreservesLargeIntegersInRawMaps guards the json.Decoder + UseNumber
+// path in Do: a raw-map response (ClusterInfo style) carrying integers above
+// 2^53 or large enough to render in scientific notation must keep its exact
+// textual form. A plain json.Unmarshal routes these through float64, which
+// both loses precision (9007199254740993 -> ...992) and prints "4e+09".
+func TestDoPreservesLargeIntegersInRawMaps(t *testing.T) {
+	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"objects":4000000000,"bigId":9007199254740993,"memBytes":17179869184}`))
+	})
+	var out map[string]any
+	require.NoError(t, c.Do(context.Background(), http.MethodGet, "/x", nil, nil, &out))
+
+	bigID, ok := out["bigId"].(json.Number)
+	require.True(t, ok, "expected json.Number, got %T", out["bigId"])
+	assert.Equal(t, "9007199254740993", bigID.String())
+	n, err := bigID.Int64()
+	require.NoError(t, err)
+	assert.Equal(t, int64(9007199254740993), n, "value above 2^53 must survive intact")
+
+	objects, ok := out["objects"].(json.Number)
+	require.True(t, ok)
+	assert.Equal(t, "4000000000", objects.String(), "must not render in scientific notation")
+}
+
 func TestConfigureNamespaceReturnsMessage(t *testing.T) {
 	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v1/clusters/conn-1/namespaces", r.URL.Path)

@@ -26,7 +26,12 @@ func TestListRecordsBuildsQueryParams(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, out.Records, 1)
 	assert.Equal(t, "alice", out.Records[0].Key.PK)
-	assert.Equal(t, 30, int(out.Records[0].Bins["age"].(float64)))
+	// Record bins land in a map[string]any, decoded with json.Decoder.UseNumber,
+	// so an integer bin arrives as json.Number — keeping int64 values above 2^53
+	// exact instead of routing them through float64.
+	age, ok := out.Records[0].Bins["age"].(json.Number)
+	require.True(t, ok, "expected json.Number, got %T", out.Records[0].Bins["age"])
+	assert.Equal(t, "30", age.String())
 }
 
 func TestListRecordsRequiresNamespace(t *testing.T) {

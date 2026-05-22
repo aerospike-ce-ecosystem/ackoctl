@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -221,13 +222,21 @@ the cluster ejects nodes and can lose data on unreplicated partitions.`,
 }
 
 // intField extracts an integer from a map[string]any returned by the API.
-// JSON numbers decode as float64; int/int64 are accepted for robustness.
+// The REST client decodes raw-map responses with json.Number, so that is the
+// common case; float64/int/int64 are still accepted for robustness against
+// callers (and tests) that build the map directly.
 func intField(m map[string]any, key string) (int, bool) {
 	v, ok := m[key]
 	if !ok || v == nil {
 		return 0, false
 	}
 	switch t := v.(type) {
+	case json.Number:
+		n, err := t.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return int(n), true
 	case float64:
 		return int(t), true
 	case int:

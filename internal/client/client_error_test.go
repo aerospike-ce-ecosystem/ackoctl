@@ -87,3 +87,18 @@ func TestDoEmptyBodyWithExpectedOut(t *testing.T) {
 	require.Error(t, err, "empty body with a typed out target must surface, not silently zero-value")
 	assert.Contains(t, err.Error(), "empty body")
 }
+
+func TestTruncateDoesNotSplitMultibyteCodepoint(t *testing.T) {
+	// Each Korean syllable is 3 UTF-8 bytes; a byte-index slice at n=4 would
+	// cut the second rune mid-codepoint and emit a U+FFFD replacement char.
+	s := strings.Repeat("가", 10) // 10 runes, 30 bytes
+	got := truncate(s, 4)
+	assert.Equal(t, strings.Repeat("가", 4)+"...", got)
+	assert.NotContains(t, got, "�", "truncate must not produce a replacement char")
+	assert.Equal(t, 4, len([]rune(strings.TrimSuffix(got, "..."))), "exactly 4 runes kept")
+}
+
+func TestTruncateShorterThanLimitIsUnchanged(t *testing.T) {
+	s := "한글"
+	assert.Equal(t, s, truncate(s, 10))
+}

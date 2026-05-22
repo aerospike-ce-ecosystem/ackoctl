@@ -175,7 +175,16 @@ the cluster ejects nodes and can lose data on unreplicated partitions.`,
 			if err != nil {
 				return err
 			}
-			if cur, ok := intField(current, "size"); ok && size < cur && !yes {
+			cur, ok := intField(current, "size")
+			switch {
+			case !ok && !yes:
+				// The GET response did not carry a resolvable node count, so we
+				// cannot tell whether this is a scale-down. Treat "cannot
+				// confirm" as "must confirm" and require --yes rather than
+				// skipping the guard — silently proceeding could shrink the
+				// cluster and lose data on unreplicated partitions.
+				return fmt.Errorf("cannot determine current cluster size from the server response; pass --yes to proceed with scaling to %d", size)
+			case ok && size < cur && !yes:
 				return fmt.Errorf("refusing scale-down %d -> %d without --yes (data-loss risk on unreplicated partitions)", cur, size)
 			}
 			out, err := c.ScaleK8sCluster(cmd.Context(), ns, name, size)

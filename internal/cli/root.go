@@ -57,6 +57,14 @@ go through cluster-manager's /api/* surface.`,
 			flags.WorkspaceExplicit = f.Changed("workspace")
 			flags.WorkspaceEnvExplicit = os.Getenv(config.EnvWorkspace) != ""
 			flags.InsecureSkipTLSExplicit = f.Changed("insecure-skip-tls")
+			// Validate -o once, before any subcommand RunE builds a client or
+			// makes a network call. Without this the only -o validation is the
+			// per-command global.Format() call, which runs AFTER the API request
+			// — so `record put ... -o xml` would mutate server state and then
+			// exit 1, misleading the user into retrying a non-idempotent write.
+			if _, err := output.Parse(flags.OutputFormat); err != nil {
+				return err
+			}
 			runVersionCheck(c, flags.NoVersionCheck)
 			return nil
 		},

@@ -88,6 +88,23 @@ func runQueryCmd(t *testing.T, srvURL string, args ...string) (string, error) {
 	return stdout.String(), err
 }
 
+func TestQueryExecRejectsOutOfRangeMaxRecords(t *testing.T) {
+	for _, maxRecords := range []string{"-1", "1000001"} {
+		t.Run("maxRecords="+maxRecords, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --max-records is out of range")
+			}))
+			t.Cleanup(srv.Close)
+			_, err := runQueryCmd(t, srv.URL,
+				"query", "exec", "conn-1",
+				"--namespace", "test", "--max-records", maxRecords,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--max-records must be 0")
+		})
+	}
+}
+
 func TestQueryExecPredicateRequiresValue(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server should not be hit when a predicate has no --value")

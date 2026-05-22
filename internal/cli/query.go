@@ -36,6 +36,11 @@ scan limited by --max-records. --value/--value2 are parsed as JSON so the
 correct particle type (number, string, list, etc.) reaches the server.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate --max-records client-side: 0 means "server default",
+			// otherwise it must fall within the documented 1..1000000 range.
+			if maxRecords < 0 || maxRecords > 1000000 {
+				return fmt.Errorf("--max-records must be 0 (server default) or between 1 and 1000000, got %d", maxRecords)
+			}
 			req := client.QueryRequest{
 				Namespace:  namespace,
 				Set:        set,

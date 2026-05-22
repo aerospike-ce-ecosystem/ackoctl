@@ -38,6 +38,12 @@ func newRecordListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List records in a namespace/set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate --page-size against the documented 1..500 bound before
+			// building a client or hitting the network, matching the
+			// client-side checks the k8s/query commands already perform.
+			if pageSize < 1 || pageSize > 500 {
+				return fmt.Errorf("--page-size must be between 1 and 500, got %d", pageSize)
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -246,6 +252,17 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Filtered record scan with optional pk pattern and bin filters",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate pagination bounds client-side so a typo fails fast
+			// instead of round-tripping to a server 422.
+			if page < 1 {
+				return fmt.Errorf("--page must be 1 or greater, got %d", page)
+			}
+			if pageSize < 1 || pageSize > 500 {
+				return fmt.Errorf("--page-size must be between 1 and 500, got %d", pageSize)
+			}
+			if maxRecords < 0 {
+				return fmt.Errorf("--max-records must not be negative, got %d", maxRecords)
+			}
 			req := client.FilteredQueryRequest{
 				Namespace:   namespace,
 				Set:         set,

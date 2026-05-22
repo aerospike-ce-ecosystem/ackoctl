@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -106,7 +107,7 @@ as the registered module name. cluster-manager validates the filename against
 			if len(data) == 0 {
 				return fmt.Errorf("udf source file %s is empty", filePath)
 			}
-			effective := filename
+			effective := strings.TrimSpace(filename)
 			if effective == "" {
 				effective = filepath.Base(filePath)
 			}
@@ -155,6 +156,13 @@ func newUdfRemoveCmd(global *GlobalFlags) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
+			}
+			// MarkFlagRequired only checks --filename was supplied, not that it
+			// carries a name. Reject empty/whitespace values so the server is
+			// never hit with a meaningless removal request.
+			filename = strings.TrimSpace(filename)
+			if filename == "" {
+				return fmt.Errorf("--filename must not be empty")
 			}
 			c, err := newClient(cmd, global)
 			if err != nil {

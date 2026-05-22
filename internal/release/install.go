@@ -168,9 +168,18 @@ func (c *Client) downloadFile(ctx context.Context, url, dst string) error {
 	if err != nil {
 		return fmt.Errorf("create %s: %w", dst, err)
 	}
-	defer f.Close()
 	if _, err := io.Copy(f, resp.Body); err != nil {
+		// Close (best effort) and remove the partial file so a later
+		// checksum step does not see a truncated download.
+		f.Close()
+		os.Remove(dst)
 		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	// Close explicitly and surface the error — a deferred close swallows
+	// delayed-write / out-of-space failures, which would otherwise resurface
+	// as a misleading "checksum mismatch".
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close %s: %w", dst, err)
 	}
 	return nil
 }
@@ -254,6 +263,7 @@ func extractBinary(archivePath, dst string) error {
 		n, err := io.Copy(out, io.LimitReader(tr, maxBinarySize+1))
 		if err != nil {
 			out.Close()
+			os.Remove(dst)
 			return fmt.Errorf("write extracted binary: %w", err)
 		}
 		if n > maxBinarySize {

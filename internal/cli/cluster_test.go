@@ -50,6 +50,40 @@ func TestClusterConfigureNamespaceSendsNameField(t *testing.T) {
 	assert.Equal(t, "90", got["stop-writes-pct"])
 }
 
+// Regression: --param is registered with StringArrayVar (not StringSliceVar)
+// so a value containing commas — e.g. a storage-engine device list — survives
+// intact. StringSliceVar would split on the comma, sending only the first
+// fragment and dropping the rest, or failing the key=value check entirely.
+func TestClusterConfigureNamespacePreservesCommasInParamValue(t *testing.T) {
+	var got map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"ok"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs([]string{
+		"cluster", "configure-namespace", "conn-1",
+		"--name", "test",
+		"--param", "storage-engine=device,/dev/sda",
+		"--param", "stop-writes-pct=90",
+	})
+	root.SetContext(context.Background())
+	require.NoError(t, root.Execute())
+
+	// The comma-containing value must arrive whole — not truncated at the comma.
+	assert.Equal(t, "device,/dev/sda", got["storage-engine"],
+		"comma-containing --param value must not be split")
+	assert.Equal(t, "90", got["stop-writes-pct"])
+}
+
 func TestClusterConfigureNamespaceRejectsReservedParam(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server must not be called when client guard rejects the input")

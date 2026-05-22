@@ -63,6 +63,13 @@ func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
 Namespaces cannot be created at runtime — they must be defined in aerospike.conf.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Require at least one --param: a request carrying only the
+			// namespace name is a no-op the server would either reject or
+			// silently apply nothing for. Failing fast tells the user the
+			// command did nothing because they forgot to pass a parameter.
+			if len(params) == 0 {
+				return fmt.Errorf("at least one --param key=value is required")
+			}
 			// The cluster-manager body schema names the namespace field `name`
 			// (see CreateNamespaceRequest in api/models/cluster.py). The
 			// previous build sent `namespace`, which the server rejected with

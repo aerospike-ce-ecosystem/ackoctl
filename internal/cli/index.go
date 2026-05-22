@@ -69,6 +69,9 @@ func newIndexCreateCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Create a secondary index",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validateIndexType(idxType); err != nil {
+				return err
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err

@@ -191,3 +191,16 @@ func TestQueryExecBetweenRoundTrip(t *testing.T) {
 	assert.Equal(t, float64(10), pred["value"])
 	assert.Equal(t, float64(20), pred["value2"])
 }
+
+func TestQueryExecRejectsUnknownPKType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --pk-type is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--primary-key", "k", "--pk-type", "integer",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto|string|int|bytes")
+}

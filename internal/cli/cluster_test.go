@@ -132,3 +132,27 @@ func TestClusterConfigureNamespaceRejectsEmptyParamKey(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "key must not be empty")
 }
+
+func TestClusterConfigureNamespaceRequiresAtLeastOneParam(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when no --param is supplied")
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	// No --param: the request would carry only {"name": ...}, a no-op the
+	// server cannot act on. The guard must reject it before any HTTP call.
+	root.SetArgs([]string{
+		"cluster", "configure-namespace", "conn-1",
+		"--name", "test",
+	})
+	root.SetContext(context.Background())
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at least one --param")
+}

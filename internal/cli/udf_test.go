@@ -233,3 +233,30 @@ func TestUdfUploadDefaultTableDoesNotPanic(t *testing.T) {
 	assert.Contains(t, out, "hi.lua")
 	assert.Contains(t, out, "abc123")
 }
+
+func TestUdfUploadRejectsOversizedFile(t *testing.T) {
+	tmp := t.TempDir()
+	src := filepath.Join(tmp, "huge.lua")
+	// One byte over the cap is enough to trip the guard.
+	require.NoError(t, os.WriteFile(src, make([]byte, maxUDFSourceSize+1), 0o600))
+
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when source file exceeds the size cap")
+	}))
+	t.Cleanup(srv.Close)
+
+	_, _, err := runUdfCmd(t, srv.URL, "udf", "upload", "conn-1", "--file", src)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds the")
+}
+
+func TestUdfUploadRejectsDirectory(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --file is a directory")
+	}))
+	t.Cleanup(srv.Close)
+
+	_, _, err := runUdfCmd(t, srv.URL, "udf", "upload", "conn-1", "--file", t.TempDir())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "directory")
+}

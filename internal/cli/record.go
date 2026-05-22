@@ -90,6 +90,9 @@ func newRecordGetCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Get a single record by primary key",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePKType(pkType); err != nil {
+				return err
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -125,6 +128,9 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Create or replace a record",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePKType(pkType); err != nil {
+				return err
+			}
 			bins := map[string]any{}
 			if err := json.Unmarshal([]byte(binsJSON), &bins); err != nil {
 				return fmt.Errorf("--bins must be a JSON object: %w", err)
@@ -179,6 +185,9 @@ func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
+			if err := validatePKType(pkType); err != nil {
+				return err
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -216,6 +225,9 @@ record to disappear server-side — this is standard Aerospike behaviour.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
+			}
+			if err := validatePKType(pkType); err != nil {
+				return err
 			}
 			c, err := newClient(cmd, global)
 			if err != nil {
@@ -262,6 +274,9 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 			}
 			if maxRecords < 0 {
 				return fmt.Errorf("--max-records must not be negative, got %d", maxRecords)
+			}
+			if err := validatePKType(pkType); err != nil {
+				return err
 			}
 			req := client.FilteredQueryRequest{
 				Namespace:   namespace,

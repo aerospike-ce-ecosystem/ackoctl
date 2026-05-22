@@ -11,6 +11,13 @@ import (
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/output"
 )
 
+// maxUDFSourceSize caps how large a Lua source file `udf upload` will read
+// into memory before sending it as a JSON string body. 5 MiB is far above
+// any realistic Lua module while still bounding the request: without a cap,
+// pointing --file at a multi-gigabyte file would balloon ackoctl's memory
+// and produce an oversized request the server rejects anyway.
+const maxUDFSourceSize = 5 << 20 // 5 MiB
+
 func newUdfCmd(global *GlobalFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "udf",
@@ -80,6 +87,18 @@ as the registered module name. cluster-manager validates the filename against
 ^[a-zA-Z0-9_.-]{1,255}$ — invalid names surface as a 422 error.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Stat first so an oversized or non-regular file is rejected
+			// before its bytes are pulled into memory.
+			info, err := os.Stat(filePath)
+			if err != nil {
+				return fmt.Errorf("read udf source: %w", err)
+			}
+			if info.IsDir() {
+				return fmt.Errorf("udf source %s is a directory, not a file", filePath)
+			}
+			if info.Size() > maxUDFSourceSize {
+				return fmt.Errorf("udf source file %s is %d bytes, exceeds the %d byte limit", filePath, info.Size(), maxUDFSourceSize)
+			}
 			data, err := os.ReadFile(filePath)
 			if err != nil {
 				return fmt.Errorf("read udf source: %w", err)

@@ -310,3 +310,32 @@ func TestConnectionHealthRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, stdout, `"connected": true`)
 }
+
+func TestConnectionCreateRejectsOutOfRangePort(t *testing.T) {
+	for _, port := range []string{"0", "-1", "65536", "99999"} {
+		t.Run("port="+port, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --port is out of range")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runConnectionCmd(t, srv.URL, "",
+				"connection", "create",
+				"--name", "c", "--host", "h1", "--port", port,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "between 1 and 65535")
+		})
+	}
+}
+
+func TestConnectionUpdateRejectsOutOfRangePort(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --port is out of range")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runConnectionCmd(t, srv.URL, "",
+		"connection", "update", "c1", "--port", "70000",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "between 1 and 65535")
+}

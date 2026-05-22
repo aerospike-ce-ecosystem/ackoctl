@@ -115,3 +115,31 @@ func TestRecordQueryRejectsOutOfRangePagination(t *testing.T) {
 		})
 	}
 }
+
+func TestRecordGetRejectsUnknownPKType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --pk-type is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "get", "conn-1",
+		"--namespace", "test", "--set", "s", "--pk", "k",
+		"--pk-type", "integer",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto|string|int|bytes")
+}
+
+func TestRecordDeleteRejectsUnknownPKType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --pk-type is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "delete", "conn-1",
+		"--namespace", "test", "--set", "s", "--pk", "k",
+		"--pk-type", "blob", "--yes",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto|string|int|bytes")
+}

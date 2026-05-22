@@ -180,6 +180,9 @@ func newNoteRecordUpdateCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Create or update the operator note on a single record",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validatePKType(pkType); err != nil {
+				return err
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -219,6 +222,9 @@ func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
+			}
+			if err := validatePKType(pkType); err != nil {
+				return err
 			}
 			c, err := newClient(cmd, global)
 			if err != nil {

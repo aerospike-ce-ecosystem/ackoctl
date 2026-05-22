@@ -41,6 +41,9 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 			if maxRecords < 0 || maxRecords > 1000000 {
 				return fmt.Errorf("--max-records must be 0 (server default) or between 1 and 1000000, got %d", maxRecords)
 			}
+			if err := validatePKType(pkType); err != nil {
+				return err
+			}
 			req := client.QueryRequest{
 				Namespace:  namespace,
 				Set:        set,

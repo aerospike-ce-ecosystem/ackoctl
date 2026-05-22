@@ -198,3 +198,17 @@ func TestNoteRecordListRequiresNamespaceAndSet(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "required")
 }
+
+func TestNoteRecordUpdateRejectsUnknownPKType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --pk-type is invalid")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runNoteCmd(t, srv.URL,
+		"note", "record", "update", "conn-1",
+		"--namespace", "test", "--set", "s", "--pk", "k",
+		"--pk-type", "integer", "--note", "memo",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "auto|string|int|bytes")
+}

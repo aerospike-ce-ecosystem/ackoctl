@@ -180,8 +180,13 @@ func parseAPIError(status int, contentType string, body []byte) *APIError {
 	var envelope struct {
 		Detail any `json:"detail"`
 	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		apiErr.Detail = fmt.Sprintf("malformed JSON error body: %s", truncate(string(body), 200))
+	// Use a distinct variable name so a later edit doesn't shadow the outer
+	// `err` and so the unmarshal reason ("unexpected EOF", "invalid character
+	// at offset N", etc.) stays visible — that's the most diagnostic piece a
+	// human gets when the server returns a malformed error envelope.
+	if jsonErr := json.Unmarshal(body, &envelope); jsonErr != nil {
+		apiErr.Detail = fmt.Sprintf("malformed JSON error body: %s; body: %s",
+			jsonErr.Error(), truncate(string(body), 200))
 		return apiErr
 	}
 	switch v := envelope.Detail.(type) {

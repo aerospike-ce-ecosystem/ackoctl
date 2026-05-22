@@ -237,6 +237,36 @@ func TestReplaceSameFs(t *testing.T) {
 	}
 }
 
+// TestDownloadFileWritesFullBytes covers the fsync/close path added so a
+// later checksum step or extract step never re-reads a truncated download.
+// We assert the on-disk byte count matches what the server sent — a missing
+// Sync would not fail this test on its own (the regular Close already
+// flushes the page cache to the FS), but the explicit size check guards
+// against future regressions where the copy path drops the tail.
+func TestDownloadFileWritesFullBytes(t *testing.T) {
+	payload := bytes.Repeat([]byte("ackoctl-payload-"), 4096) // 64 KiB
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+
+	c := New()
+	dst := filepath.Join(t.TempDir(), "out.bin")
+	if err := c.downloadFile(context.Background(), srv.URL, dst); err != nil {
+		t.Fatalf("downloadFile: %v", err)
+	}
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != len(payload) {
+		t.Fatalf("on-disk size = %d, want %d", len(got), len(payload))
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("on-disk content mismatch")
+	}
+}
+
 func TestPlatformDefaults(t *testing.T) {
 	// Sanity-check that GOOS/GOARCH match runtime — this guards against a
 	// future refactor that forgets to wire the package vars to runtime.

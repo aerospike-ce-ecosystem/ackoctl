@@ -131,6 +131,19 @@ func TestInfoRequiresCommandFlag(t *testing.T) {
 	assert.Contains(t, err.Error(), "required")
 }
 
+func TestInfoRejectsEmptyCommandValue(t *testing.T) {
+	// MarkFlagRequired only checks --command was supplied. An empty value
+	// (`--command ""`) must still be rejected before any server round-trip.
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be hit when --command is empty")
+	}))
+	t.Cleanup(srv.Close)
+
+	_, _, err := runInfoCmd(t, srv.URL, "info", "conn-1", "--command", "  ")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must not be empty")
+}
+
 func TestInfoTableOutputRendersHeaders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

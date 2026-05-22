@@ -102,6 +102,9 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 		Use:   "create",
 		Short: "Create a connection profile",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := validatePort(port); err != nil {
+				return err
+			}
 			cleanHosts, err := sanitizeHosts(hosts)
 			if err != nil {
 				return err
@@ -184,6 +187,9 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 				req.Hosts = cleanHosts
 			}
 			if cmd.Flags().Changed("port") {
+				if err := validatePort(port); err != nil {
+					return err
+				}
 				req.Port = &port
 			}
 			if cmd.Flags().Changed("cluster-name") {

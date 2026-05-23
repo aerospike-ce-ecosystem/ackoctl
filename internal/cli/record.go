@@ -131,6 +131,9 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
+			if err := validateBinsJSONObject(binsJSON); err != nil {
+				return err
+			}
 			bins := map[string]any{}
 			if err := json.Unmarshal([]byte(binsJSON), &bins); err != nil {
 				return fmt.Errorf("--bins must be a JSON object: %w", err)

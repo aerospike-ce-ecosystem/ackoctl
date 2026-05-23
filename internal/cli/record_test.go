@@ -144,6 +144,52 @@ func TestRecordDeleteRejectsUnknownPKType(t *testing.T) {
 	assert.Contains(t, err.Error(), "auto|string|int|bytes")
 }
 
+func TestRecordPutRejectsNonObjectBins(t *testing.T) {
+	cases := []struct {
+		name string
+		bins string
+		want string
+	}{
+		{"array", `[1,2,3]`, "array"},
+		{"string", `"hello"`, "string"},
+		{"number", `42`, "number"},
+		{"null", `null`, "null"},
+		{"empty", ``, "non-empty JSON object"},
+		{"whitespace", `   `, "non-empty JSON object"},
+		{"malformed", `not-json`, "JSON object"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --bins is not a JSON object")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "put", "conn-1",
+				"--namespace", "test", "--set", "s", "--pk", "k",
+				"--bins", tc.bins,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestRecordPutAcceptsJSONObjectBins(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"key":{"namespace":"test","set":"s","pk":"k"},"bins":{"foo":1}}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "put", "conn-1",
+		"--namespace", "test", "--set", "s", "--pk", "k",
+		"--bins", `{"foo":1}`,
+	)
+	require.NoError(t, err)
+}
+
 func TestRecordQueryRejectsUnknownPKMatchMode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server must not be called when --pk-match-mode is invalid")

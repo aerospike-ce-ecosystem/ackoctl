@@ -56,28 +56,36 @@ func validateQueryOp(op string) error {
 	}
 }
 
-// validateBinsJSONObject rejects a `record put --bins` value that is not a
-// non-empty JSON object literal. The previous implementation only relied on
-// json.Unmarshal into map[string]any, which accepts JSON `null` (yielding a
-// nil bins map) and produced opaque "unexpected end of JSON input" errors for
-// empty or whitespace input. Catching the shape client-side gives the user a
-// clear, type-aware error before any non-idempotent server call.
-func validateBinsJSONObject(binsJSON string) error {
-	trimmed := strings.TrimSpace(binsJSON)
+// validateJSONObjectFlag rejects a flag value that is not a non-empty JSON
+// object literal. json.Unmarshal into map[string]any silently accepts JSON
+// `null` (yielding a nil map) and reports "unexpected end of JSON input" for
+// empty or whitespace input, both of which are confusing or downright
+// dangerous when the resulting nil map is forwarded to the server. flagName
+// (e.g. "--bins", "--filter", "--predicate") is interpolated into the error
+// messages so callers do not need to wrap the result.
+func validateJSONObjectFlag(raw, flagName string) error {
+	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
-		return fmt.Errorf("--bins must be a non-empty JSON object, e.g. '{\"name\":\"Alice\"}'")
+		return fmt.Errorf("%s must be a non-empty JSON object, e.g. '{\"name\":\"Alice\"}'", flagName)
 	}
 	if trimmed[0] != '{' {
-		// Decode into json.RawMessage just to surface the actual top-level
-		// JSON kind in the error — e.g. array, string, number, null — so the
-		// user can see at a glance why their input was rejected.
-		var raw any
-		if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
-			return fmt.Errorf("--bins must be a JSON object: %w", err)
+		// Decode into any just to surface the actual top-level JSON kind in
+		// the error — e.g. array, string, number, null — so the user can see
+		// at a glance why their input was rejected.
+		var v any
+		if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
+			return fmt.Errorf("%s must be a JSON object: %w", flagName, err)
 		}
-		return fmt.Errorf("--bins must be a JSON object, got %s", jsonKindOf(raw))
+		return fmt.Errorf("%s must be a JSON object, got %s", flagName, jsonKindOf(v))
 	}
 	return nil
+}
+
+// validateBinsJSONObject is a thin wrapper kept for the `record put --bins`
+// call site and its existing tests. New call sites should use
+// validateJSONObjectFlag directly.
+func validateBinsJSONObject(binsJSON string) error {
+	return validateJSONObjectFlag(binsJSON, "--bins")
 }
 
 // jsonKindOf returns a human-readable name for the top-level JSON value kind

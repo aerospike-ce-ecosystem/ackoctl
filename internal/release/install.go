@@ -175,6 +175,16 @@ func (c *Client) downloadFile(ctx context.Context, url, dst string) error {
 		os.Remove(dst)
 		return fmt.Errorf("write %s: %w", dst, err)
 	}
+	// Force the kernel to flush the page cache to disk before the file is
+	// handed off to checksum verification or extraction. Without Sync, a
+	// power loss between download and the next step could leave a partial
+	// file on disk that the next ackoctl invocation re-reads as if it were
+	// complete. Close alone does not guarantee a flush to stable storage.
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(dst)
+		return fmt.Errorf("sync %s: %w", dst, err)
+	}
 	// Close explicitly and surface the error — a deferred close swallows
 	// delayed-write / out-of-space failures, which would otherwise resurface
 	// as a misleading "checksum mismatch".

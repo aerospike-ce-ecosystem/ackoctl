@@ -32,13 +32,22 @@ func TestParseAPIErrorMalformedJSON(t *testing.T) {
 	c, _ := newTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write([]byte(`{"detail":`))
+		_, _ = w.Write([]byte(`{not-json`))
 	})
 	err := c.Do(context.Background(), http.MethodGet, "/x", nil, nil, nil)
 	require.Error(t, err)
 	var apiErr *APIError
 	require.True(t, errors.As(err, &apiErr))
 	assert.Contains(t, apiErr.Detail, "malformed JSON")
+	// The underlying json.Unmarshal error reason must survive so operators
+	// can tell "truncated body" apart from "non-JSON content" without
+	// re-fetching the request. encoding/json reports "invalid character"
+	// for the leading `{n` we sent above.
+	assert.Contains(t, apiErr.Detail, "invalid character",
+		"json.Unmarshal reason must be preserved in Detail")
+	// The truncated body snippet must still be present for debugging.
+	assert.Contains(t, apiErr.Detail, "{not-json",
+		"truncated body snippet must remain in Detail")
 }
 
 func TestParseAPIErrorListDetailMarshaled(t *testing.T) {

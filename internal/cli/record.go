@@ -296,6 +296,12 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 				SelectBins:  selectBins,
 			}
 			if filterJSON != "" {
+				// Validate the top-level JSON kind client-side so that a
+				// stray `null`, array, or scalar fails fast with a typed
+				// error instead of forwarding a nil map to the server.
+				if err := validateJSONObjectFlag(filterJSON, "--filter"); err != nil {
+					return err
+				}
 				m := map[string]any{}
 				if err := json.Unmarshal([]byte(filterJSON), &m); err != nil {
 					return fmt.Errorf("--filter must be a JSON object: %w", err)
@@ -303,6 +309,9 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 				req.Filters = m
 			}
 			if predicateJSON != "" {
+				if err := validateJSONObjectFlag(predicateJSON, "--predicate"); err != nil {
+					return err
+				}
 				m := map[string]any{}
 				if err := json.Unmarshal([]byte(predicateJSON), &m); err != nil {
 					return fmt.Errorf("--predicate must be a JSON object: %w", err)

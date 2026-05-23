@@ -202,3 +202,115 @@ func TestRecordQueryRejectsUnknownPKMatchMode(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exact|prefix|regex")
 }
+
+// queryFlagBadShapes is the shared rejection matrix for --filter and
+// --predicate. "" and whitespace-only values must also be rejected when the
+// flag is explicitly set, because the empty-string path in record.go is the
+// "flag not supplied" branch — but the cobra parser still routes through the
+// same flag, so the validator must fail before any HTTP request fires.
+var queryFlagBadShapes = []struct {
+	name string
+	raw  string
+	want string
+}{
+	{"null", `null`, "null"},
+	{"array", `[]`, "array"},
+	{"string", `"str"`, "string"},
+	{"number", `42`, "number"},
+	{"bool", `true`, "bool"},
+	{"malformed", `{malformed`, "JSON object"},
+	// Whitespace-only is non-empty at the cobra layer (so it bypasses the
+	// "flag not set" shortcut in record.go) but trims to empty, which the
+	// validator must catch with the non-empty-object message.
+	{"whitespace", `   `, "non-empty JSON object"},
+}
+
+func TestRecordQueryRejectsNonObjectFilter(t *testing.T) {
+	for _, tc := range queryFlagBadShapes {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --filter is not a JSON object")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "query", "conn-1",
+				"--namespace", "test", "--filter", tc.raw,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--filter")
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestRecordQueryRejectsNonObjectPredicate(t *testing.T) {
+	for _, tc := range queryFlagBadShapes {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --predicate is not a JSON object")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "query", "conn-1",
+				"--namespace", "test", "--predicate", tc.raw,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--predicate")
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestRecordQueryAcceptsJSONObjectFilter(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v1/records/conn-1/filter", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[],"total":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "query", "conn-1",
+		"--namespace", "test", "--filter", `{"age":{"$gt":18}}`,
+	)
+	require.NoError(t, err)
+	assert.True(t, called, "server should be called for a valid JSON-object --filter")
+}
+
+func TestRecordQueryAcceptsJSONObjectPredicate(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v1/records/conn-1/filter", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[],"total":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "query", "conn-1",
+		"--namespace", "test", "--predicate", `{"bin":"age","op":"equals","value":42}`,
+	)
+	require.NoError(t, err)
+	assert.True(t, called, "server should be called for a valid JSON-object --predicate")
+}
+
+// TestRecordQueryAcceptsEmptyFilter pins the "flag not set" path: an empty
+// --filter must skip validation entirely and send no filter to the API.
+func TestRecordQueryAcceptsEmptyFilter(t *testing.T) {
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"items":[],"total":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "query", "conn-1",
+		"--namespace", "test",
+	)
+	require.NoError(t, err)
+	assert.True(t, called, "server should be called when --filter is omitted")
+}

@@ -63,6 +63,55 @@ func TestValidateQueryOpRejectsUnknown(t *testing.T) {
 	}
 }
 
+func TestValidateBinsJSONObjectAccepted(t *testing.T) {
+	for _, v := range []string{
+		`{"foo":1}`,
+		`{}`,
+		`  {"foo":"bar","baz":[1,2,3]}  `,
+		"\n{\"a\":1}\n",
+	} {
+		require.NoError(t, validateBinsJSONObject(v), "bins %q should be accepted", v)
+	}
+}
+
+func TestValidateBinsJSONObjectRejectsEmpty(t *testing.T) {
+	for _, v := range []string{"", " ", "\t\n  "} {
+		err := validateBinsJSONObject(v)
+		require.Error(t, err, "bins %q should be rejected", v)
+		assert.Contains(t, err.Error(), "non-empty JSON object")
+	}
+}
+
+func TestValidateBinsJSONObjectRejectsNonObject(t *testing.T) {
+	cases := []struct {
+		in   string
+		kind string
+	}{
+		{`[1,2,3]`, "array"},
+		{`"hello"`, "string"},
+		{`42`, "number"},
+		{`null`, "null"},
+		{`true`, "bool"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			err := validateBinsJSONObject(tc.in)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "JSON object")
+			assert.Contains(t, err.Error(), tc.kind)
+		})
+	}
+}
+
+func TestValidateBinsJSONObjectRejectsMalformed(t *testing.T) {
+	// Leading char is not '{' and the body is not valid JSON either — the
+	// underlying decoder error should still flow through wrapped, not be
+	// swallowed by the kind-detection fallthrough.
+	err := validateBinsJSONObject("not json at all")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "JSON object")
+}
+
 func TestValidatePKMatchModeAccepted(t *testing.T) {
 	for _, v := range []string{"", "exact", "prefix", "regex"} {
 		require.NoError(t, validatePKMatchMode(v), "pk-match-mode %q should be accepted", v)

@@ -6,7 +6,7 @@ It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aero
 
 ## Status
 
-**v0.1.0** — feature-complete for the control plane (connections, cluster info, k8s), data plane (records, sets), query and secondary-index management.
+**Current main** — feature-complete for the control plane (connections, cluster info, k8s), data plane (records, sets), query, secondary-index management, notes, guides, admin, UDFs, and raw asinfo reads.
 
 See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.md](docs/install.md) for build and install options, and [docs/e2e-kind.md](docs/e2e-kind.md) for an in-cluster (kind + ACKO + cluster-manager) end-to-end test scenario.
 
@@ -60,6 +60,7 @@ Override priority: CLI flag > environment variable > config file.
 | `ACKOCTL_TOKEN`  | `--token`  |
 | `ACKOCTL_WORKSPACE` | `--workspace` |
 | `ACKOCTL_CONTEXT` | `--context` |
+| `ACKOCTL_INSECURE_SKIP_TLS` | `--insecure-skip-tls` |
 
 OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser device flow) and passed via `--token` or `ACKOCTL_TOKEN`.
 
@@ -72,18 +73,23 @@ ackoctl
 ├── config       view | set-context | use-context | current-context | delete-context
 ├── connection   list | get | create | update | delete | health
 ├── cluster      info | configure-namespace
-├── k8s cluster  list | get | reconcile
-├── record       list | get | put | delete | query
+├── k8s cluster  list | get | reconcile | scale | logs | events
+├── record       list | get | put | delete | delete-bin | query
 ├── set          list
 ├── query        exec
-└── index        list | create | delete
+├── index        list | create | delete
+├── info         <CONN_ID> --command=...
+├── admin        user | role
+├── note         set | record
+├── guide        list | get
+└── udf          list | upload | remove
 ```
 
 See [docs/usage.md](docs/usage.md) for examples.
 
 ## Roadmap
 
-- v0.2: admin (users/roles), UDF management, scriptable `--watch` flag
+- v0.2: scriptable `--watch` flag
 - v0.3: workspace CRUD, multi-cluster pivot helpers
 - v1.0: stability promise after wider field testing
 

@@ -3,8 +3,8 @@
 #
 #   curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
 #
-# Options (set in the environment before the curl pipe, or pass the version
-# as the first positional argument when running the script directly):
+# Options (set on the sh process in the curl pipe, or pass the version as the
+# first positional argument when running the script directly):
 #
 #   ACKOCTL_VERSION   pin a specific release, e.g. v0.1.0 (default: latest)
 #   BIN_DIR           target directory (default: /usr/local/bin; falls back to

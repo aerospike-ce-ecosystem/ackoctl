@@ -339,3 +339,23 @@ func TestConnectionUpdateRejectsOutOfRangePort(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "between 1 and 65535")
 }
+
+// TestConnectionUpdateRejectsBothPasswordModes verifies that supplying both
+// --password and --password-stdin at once is rejected by Cobra's mutual
+// exclusion check BEFORE any HTTP call is issued — without it a user could
+// silently double-supply credentials and not notice the conflict.
+func TestConnectionUpdateRejectsBothPasswordModes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --password and --password-stdin are both set")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runConnectionCmd(t, srv.URL, "",
+		"connection", "update", "c1", "--password=secret", "--password-stdin",
+	)
+	require.Error(t, err)
+	// Cobra's MarkFlagsMutuallyExclusive message contains "none of the others can be"
+	// for the flag set; assert on the flag names so the test stays meaningful even
+	// if Cobra reorders the wording.
+	assert.Contains(t, err.Error(), "password")
+	assert.Contains(t, err.Error(), "password-stdin")
+}

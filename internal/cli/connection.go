@@ -159,16 +159,17 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 
 func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 	var (
-		name        string
-		hosts       []string
-		port        int
-		clusterName string
-		username    string
-		password    string
-		color       string
-		note        string
-		labels      []string
-		workspaceID string
+		name          string
+		hosts         []string
+		port          int
+		clusterName   string
+		username      string
+		password      string
+		passwordStdin bool
+		color         string
+		note          string
+		labels        []string
+		workspaceID   string
 	)
 	cmd := &cobra.Command{
 		Use:   "update ID",
@@ -198,8 +199,17 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 			if cmd.Flags().Changed("user") {
 				req.Username = &username
 			}
-			if cmd.Flags().Changed("pass") {
-				req.Password = &password
+			// Unlike create, update treats password as optional — a user may
+			// only want to change the server URL. But when either input mode
+			// IS supplied, route it through resolvePassword so --password and
+			// --password-stdin are mutually exclusive and stdin gets read
+			// safely. MarkFlagsMutuallyExclusive below rejects both-set early.
+			if cmd.Flags().Changed("password") || cmd.Flags().Changed("password-stdin") {
+				pw, err := resolvePassword(cmd.InOrStdin(), password, passwordStdin)
+				if err != nil {
+					return err
+				}
+				req.Password = &pw
 			}
 			if cmd.Flags().Changed("color") {
 				req.Color = &color
@@ -237,11 +247,16 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 0, "new port")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", "", "new cluster name")
 	cmd.Flags().StringVar(&username, "user", "", "new username")
-	cmd.Flags().StringVar(&password, "pass", "", "new password")
+	cmd.Flags().StringVar(&password, "password", "", "new password in plaintext — visible in shell history; prefer --password-stdin")
+	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read new password from stdin (mutually exclusive with --password)")
 	cmd.Flags().StringVar(&color, "color", "", "new accent color")
 	cmd.Flags().StringVar(&note, "note", "", "new note")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "replace labels — key=value (repeatable)")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "move to a new workspace")
+	// Password is OPTIONAL on update (user may want to change just the server
+	// URL), so we don't MarkFlagsOneRequired like create does — but supplying
+	// BOTH input modes is still a user error.
+	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
 	return cmd
 }
 

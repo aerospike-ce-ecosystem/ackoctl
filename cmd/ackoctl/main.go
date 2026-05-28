@@ -53,6 +53,15 @@ func run() int {
 // error (which keeps the generic exit code 1).
 const exitAborted = 130
 
+// Structured exit codes for cluster-manager APIError responses let CI/scripts
+// distinguish a user/input failure (retry won't help) from a server failure
+// (retry might help). The values mirror the convention used by curl's
+// --fail-with-body and gh: 4 for 4xx, 5 for 5xx, 1 for everything else.
+const (
+	exitClientError = 4
+	exitServerError = 5
+)
+
 // printError gives users a single line of actionable context when something
 // went wrong and returns the process exit code. APIError already carries the
 // FastAPI detail; config errors get a "hint" line pointing at the config
@@ -73,9 +82,25 @@ func printError(w io.Writer, err error) int {
 		var apiErr *client.APIError
 		if errors.As(err, &apiErr) {
 			fmt.Fprintln(w, "Error:", apiErr.Error())
-			return 1
+			return apiErrorExitCode(apiErr.StatusCode)
 		}
 		fmt.Fprintln(w, "Error:", err)
+		return 1
+	}
+}
+
+// apiErrorExitCode maps a cluster-manager HTTP status code to a process exit
+// code. 4xx -> 4 (caller-side: bad request, auth, not found — won't fix on
+// retry), 5xx -> 5 (server-side: upstream/transient — retry may help). Codes
+// outside the 400-599 band are surfaced as the generic 1 so we don't lie about
+// the failure category.
+func apiErrorExitCode(status int) int {
+	switch {
+	case status >= 400 && status < 500:
+		return exitClientError
+	case status >= 500 && status < 600:
+		return exitServerError
+	default:
 		return 1
 	}
 }

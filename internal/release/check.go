@@ -68,6 +68,13 @@ func WriteCache(path string, v *VersionCheck) error {
 	// temp name no longer exists, so the deferred Remove is a harmless no-op;
 	// on any error path (including a failed rename) it prevents a leak.
 	defer os.Remove(tmpName)
+	// Enforce 0600 explicitly — os.CreateTemp's mode is platform-dependent
+	// (notably looser on macOS), and we mirror internal/config.Save here for
+	// consistency even though the cache file holds no credentials.
+	if err := os.Chmod(tmpName, 0o600); err != nil {
+		tmp.Close()
+		return err
+	}
 	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
 		return err

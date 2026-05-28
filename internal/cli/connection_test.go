@@ -359,3 +359,43 @@ func TestConnectionUpdateRejectsBothPasswordModes(t *testing.T) {
 	assert.Contains(t, err.Error(), "password")
 	assert.Contains(t, err.Error(), "password-stdin")
 }
+
+// TestConnectionCreateRejectsBothPasswordModes mirrors the update-side guard:
+// supplying both --password and --password-stdin on `connection create` must be
+// rejected by Cobra's mutual exclusion check BEFORE any HTTP call, so a user
+// can never silently double-supply credentials at profile creation time.
+func TestConnectionCreateRejectsBothPasswordModes(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --password and --password-stdin are both set")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runConnectionCmd(t, srv.URL, "",
+		"connection", "create",
+		"--name", "Prod", "--host", "h1",
+		"--password=secret", "--password-stdin",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "password")
+	assert.Contains(t, err.Error(), "password-stdin")
+}
+
+// TestConnectionCreateOmitsPasswordWhenUnset confirms an unauthenticated CE
+// connection still works: when neither --password nor --password-stdin is
+// supplied, the create request must NOT carry a password field (an empty
+// string would be rejected by some auth-enabled targets that expect "no auth
+// requested" semantics, and is anyway noise on the wire).
+func TestConnectionCreateOmitsPasswordWhenUnset(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"new","name":"Prod","hosts":["h1"],"port":3000}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runConnectionCmd(t, srv.URL, "",
+		"connection", "create", "--name", "Prod", "--host", "h1",
+	)
+	require.NoError(t, err)
+	_, hasPassword := body["password"]
+	assert.False(t, hasPassword, "password must be omitted when no flag set; got body=%v", body)
+}

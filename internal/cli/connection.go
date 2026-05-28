@@ -88,15 +88,16 @@ func newConnectionGetCmd(global *GlobalFlags) *cobra.Command {
 
 func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 	var (
-		name        string
-		hosts       []string
-		port        int
-		clusterName string
-		username    string
-		password    string
-		color       string
-		note        string
-		labels      []string
+		name          string
+		hosts         []string
+		port          int
+		clusterName   string
+		username      string
+		password      string
+		passwordStdin bool
+		color         string
+		note          string
+		labels        []string
 	)
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -113,13 +114,24 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Password is optional on create (an unauthenticated CE cluster
+			// needs no credentials). Only route through resolvePassword when
+			// the user actually supplied an input mode; MarkFlagsMutuallyExclusive
+			// rejects --password + --password-stdin together at parse time.
+			var pw string
+			if cmd.Flags().Changed("password") || cmd.Flags().Changed("password-stdin") {
+				pw, err = resolvePassword(cmd.InOrStdin(), password, passwordStdin)
+				if err != nil {
+					return err
+				}
+			}
 			req := client.CreateConnectionRequest{
 				Name:        name,
 				Hosts:       cleanHosts,
 				Port:        port,
 				ClusterName: clusterName,
 				Username:    username,
-				Password:    password,
+				Password:    pw,
 				Color:       color,
 				Note:        note,
 				Labels:      labelMap,
@@ -148,12 +160,17 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().IntVar(&port, "port", 3000, "Aerospike service port")
 	cmd.Flags().StringVar(&clusterName, "cluster-name", "", "cluster name (TLS) — optional")
 	cmd.Flags().StringVar(&username, "user", "", "auth username — optional")
-	cmd.Flags().StringVar(&password, "pass", "", "auth password — optional")
+	cmd.Flags().StringVar(&password, "password", "", "auth password in plaintext — visible in shell history; prefer --password-stdin")
+	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read auth password from stdin (mutually exclusive with --password)")
 	cmd.Flags().StringVar(&color, "color", "", "UI accent color in #RRGGBB — optional")
 	cmd.Flags().StringVar(&note, "note", "", "free-form note")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "label as key=value (repeatable)")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("host")
+	// Password is OPTIONAL on create (unauthenticated CE clusters skip it),
+	// so we don't MarkFlagsOneRequired — but supplying BOTH input modes is a
+	// user error and must be caught before any HTTP call lands.
+	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
 	return cmd
 }
 

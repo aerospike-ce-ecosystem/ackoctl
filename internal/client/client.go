@@ -39,7 +39,7 @@ func WithToken(t string) Option            { return func(c *BaseClient) { c.Toke
 func WithVerboseLogger(w io.Writer) Option { return func(c *BaseClient) { c.VerboseLogger = w } }
 
 func New(ctx config.Context, opts ...Option) *BaseClient {
-	transport := &http.Transport{}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
 	if ctx.InsecureSkipTLS {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	}

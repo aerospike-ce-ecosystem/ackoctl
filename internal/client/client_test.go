@@ -23,6 +23,17 @@ func newTestClient(t *testing.T, handler http.HandlerFunc) (*BaseClient, *httpte
 	return c, srv
 }
 
+func TestNewUsesDefaultTransportDefaults(t *testing.T) {
+	c := New(config.Context{Server: "https://cluster-manager.example.com"})
+	transport, ok := c.HTTPClient.Transport.(*http.Transport)
+	require.True(t, ok)
+
+	require.NotNil(t, transport.Proxy, "client should honor HTTP_PROXY/HTTPS_PROXY from the default transport")
+	require.NotNil(t, transport.DialContext, "client should keep the default dialer")
+	assert.Equal(t, http.DefaultTransport.(*http.Transport).MaxIdleConns, transport.MaxIdleConns)
+	assert.Equal(t, http.DefaultTransport.(*http.Transport).IdleConnTimeout, transport.IdleConnTimeout)
+}
+
 func TestDoSendsBearerAuthAndJSON(t *testing.T) {
 	var seen *http.Request
 	var seenBody []byte

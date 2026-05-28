@@ -66,7 +66,6 @@ func TestValidateQueryOpRejectsUnknown(t *testing.T) {
 func TestValidateBinsJSONObjectAccepted(t *testing.T) {
 	for _, v := range []string{
 		`{"foo":1}`,
-		`{}`,
 		`  {"foo":"bar","baz":[1,2,3]}  `,
 		"\n{\"a\":1}\n",
 	} {
@@ -76,6 +75,18 @@ func TestValidateBinsJSONObjectAccepted(t *testing.T) {
 
 func TestValidateBinsJSONObjectRejectsEmpty(t *testing.T) {
 	for _, v := range []string{"", " ", "\t\n  "} {
+		err := validateBinsJSONObject(v)
+		require.Error(t, err, "bins %q should be rejected", v)
+		assert.Contains(t, err.Error(), "non-empty JSON object")
+	}
+}
+
+func TestValidateBinsJSONObjectRejectsEmptyObject(t *testing.T) {
+	// `{}` is a syntactically valid JSON object but semantically empty — the
+	// server has no use for a put with zero bins, and the docstring on
+	// validateJSONObjectFlag promises a non-empty object. Guard against the
+	// zero-length map slipping through to the wire.
+	for _, v := range []string{`{}`, `  {}  `, "\n{}\n"} {
 		err := validateBinsJSONObject(v)
 		require.Error(t, err, "bins %q should be rejected", v)
 		assert.Contains(t, err.Error(), "non-empty JSON object")

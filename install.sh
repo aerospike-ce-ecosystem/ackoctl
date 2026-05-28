@@ -103,7 +103,13 @@ curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused \
   || err "could not download $CHECKSUM_URL — refusing to install an unverified binary"
 
 log "verifying checksum"
-EXPECTED=$(grep " $ARCHIVE\$" "$TMP/checksums.txt" | awk '{print $1}')
+# Match the entry by exact field equality on column 2 (the filename), not by
+# regex on a single-space prefix. checksums.txt is whitespace-separated and
+# the historical "grep ' $ARCHIVE$'" form was brittle to format drift (tabs,
+# double spaces) and treated $ARCHIVE as a regex — a future archive name
+# containing a regex metacharacter could match the wrong line. awk avoids
+# both problems and exits on the first hit.
+EXPECTED=$(awk -v f="$ARCHIVE" '$2==f {print $1; exit}' "$TMP/checksums.txt")
 [ -n "$EXPECTED" ] || err "no checksum entry for $ARCHIVE in checksums.txt"
 
 if command -v sha256sum >/dev/null 2>&1; then

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -82,10 +83,24 @@ func validateJSONObjectFlag(raw, flagName string) error {
 }
 
 // validateBinsJSONObject is a thin wrapper kept for the `record put --bins`
-// call site and its existing tests. New call sites should use
+// call site and its existing tests. In addition to validateJSONObjectFlag's
+// shape check, it also rejects an empty object `{}` — the server has no use
+// for a record with zero bins, and the docstring on validateJSONObjectFlag
+// promises a non-empty object. New call sites that legitimately allow an
+// empty object (e.g. `--filter`, `--predicate`) should use
 // validateJSONObjectFlag directly.
 func validateBinsJSONObject(binsJSON string) error {
-	return validateJSONObjectFlag(binsJSON, "--bins")
+	if err := validateJSONObjectFlag(binsJSON, "--bins"); err != nil {
+		return err
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(binsJSON), &m); err != nil {
+		return fmt.Errorf("--bins must be a JSON object: %w", err)
+	}
+	if len(m) == 0 {
+		return errors.New("--bins must be a non-empty JSON object")
+	}
+	return nil
 }
 
 // jsonKindOf returns a human-readable name for the top-level JSON value kind

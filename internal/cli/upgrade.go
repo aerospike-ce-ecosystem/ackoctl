@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -44,15 +45,16 @@ to a path you own (e.g. ~/.local/bin).`,
 			client := release.New()
 			currentVersion := buildInfo.Version
 
-			tag := targetVersion
-			if tag == "" {
+			tag, resolveLatest, err := normalizeUpgradeTag(targetVersion)
+			if err != nil {
+				return err
+			}
+			if resolveLatest {
 				resolved, err := client.LatestTag(ctx)
 				if err != nil {
 					return err
 				}
 				tag = resolved
-			} else if tag[0] != 'v' {
-				tag = "v" + tag
 			}
 
 			out := cmd.OutOrStdout()
@@ -105,4 +107,26 @@ to a path you own (e.g. ~/.local/bin).`,
 	cmd.Flags().StringVar(&targetVersion, "version", "", "pin a specific release (e.g. v0.1.0); defaults to the latest tag")
 	cmd.Flags().BoolVar(&check, "check", false, "only report current vs latest; do not download or replace")
 	return cmd
+}
+
+// normalizeUpgradeTag canonicalises the raw --version flag value into a
+// release tag suitable for the GitHub URL. It returns the normalised tag, a
+// "resolve latest" signal for the caller (true when the user did not pass
+// --version at all), and an error when the user passed only whitespace.
+//
+// Without the TrimSpace guard a value like " " would survive the empty
+// check, then raw[0] would be a space, the v-prefix branch would produce
+// "v " and the resulting GitHub URL would 404 with a confusing error.
+func normalizeUpgradeTag(raw string) (tag string, resolveLatest bool, err error) {
+	if raw == "" {
+		return "", true, nil
+	}
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", false, errors.New("--version must not be empty")
+	}
+	if trimmed[0] != 'v' {
+		trimmed = "v" + trimmed
+	}
+	return trimmed, false, nil
 }

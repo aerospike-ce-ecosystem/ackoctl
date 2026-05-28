@@ -6,7 +6,7 @@ It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aero
 
 ## Status
 
-**v0.1.0** — feature-complete for the control plane (connections, cluster info, k8s), data plane (records, sets), query and secondary-index management.
+**v0.2.0** — feature-complete for control-plane operations (connections, cluster info, K8s), data-plane reads/writes (records, sets, queries, secondary indexes), admin/UDF commands, operator notes, and self-upgrade.
 
 See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.md](docs/install.md) for build and install options, and [docs/e2e-kind.md](docs/e2e-kind.md) for an in-cluster (kind + ACKO + cluster-manager) end-to-end test scenario.
 
@@ -67,24 +67,28 @@ OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser devic
 
 ```
 ackoctl
-├── version
-├── upgrade
+├── admin       user | role
+├── cluster     info | configure-namespace
 ├── config       view | set-context | use-context | current-context | delete-context
 ├── connection   list | get | create | update | delete | health
-├── cluster      info | configure-namespace
-├── k8s cluster  list | get | reconcile
+├── guide        list | get
+├── info         <connection-id> --command=<asinfo-command>
+├── index        list | create | delete
+├── k8s cluster  list | get | pods | logs | events | reconcile | scale
+├── note         set | record
+├── query        exec
 ├── record       list | get | put | delete | query
 ├── set          list
-├── query        exec
-└── index        list | create | delete
+├── udf          list | upload | remove
+├── upgrade
+└── version
 ```
 
 See [docs/usage.md](docs/usage.md) for examples.
 
 ## Roadmap
 
-- v0.2: admin (users/roles), UDF management, scriptable `--watch` flag
-- v0.3: workspace CRUD, multi-cluster pivot helpers
+- v0.3: workspace CRUD, multi-cluster pivot helpers, scriptable `--watch` flag
 - v1.0: stability promise after wider field testing
 
 ## Releasing
@@ -93,8 +97,8 @@ See [docs/usage.md](docs/usage.md) for examples.
 
 ```bash
 # from a clean main branch
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 Tagging triggers `release.yml` → goreleaser builds per-OS/arch `.tar.gz` archives and `checksums.txt`, uploads them to the GitHub Release alongside `install.sh`, and (with `GH_AW_GITHUB_TOKEN` set) bumps the formula in `aerospike-ce-ecosystem/homebrew-tap`.

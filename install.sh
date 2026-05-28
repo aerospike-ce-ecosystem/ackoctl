@@ -26,6 +26,11 @@ ok()   { printf '\033[1;32m✓\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m!\033[0m %s\n' "$*" >&2; }
 err()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
+# $HOME is referenced for the $HOME/.local/bin fallback install dir. Guard
+# against an unset HOME up-front so the error message is clear instead of an
+# opaque "/.local/bin: Permission denied" later.
+[ -n "${HOME:-}" ] || err "HOME is not set; cannot determine fallback install directory"
+
 require() {
   for cmd in "$@"; do
     command -v "$cmd" >/dev/null 2>&1 || err "missing required command: $cmd"

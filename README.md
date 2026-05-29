@@ -60,6 +60,7 @@ Override priority: CLI flag > environment variable > config file.
 | `ACKOCTL_TOKEN`  | `--token`  |
 | `ACKOCTL_WORKSPACE` | `--workspace` |
 | `ACKOCTL_CONTEXT` | `--context` |
+| `ACKOCTL_INSECURE_SKIP_TLS` | `--insecure-skip-tls` |
 
 OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser device flow) and passed via `--token` or `ACKOCTL_TOKEN`.
 
@@ -77,7 +78,7 @@ ackoctl
 ├── k8s cluster  list | get | pods | logs | events | reconcile | scale
 ├── note         set | record
 ├── query        exec
-├── record       list | get | put | delete | query
+├── record       list | get | put | delete | delete-bin | query
 ├── set          list
 ├── udf          list | upload | remove
 ├── upgrade

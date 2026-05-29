@@ -199,6 +199,37 @@ func TestNoteRecordListRequiresNamespaceAndSet(t *testing.T) {
 	assert.Contains(t, err.Error(), "required")
 }
 
+func TestNoteSetUpdateRejectsEmptyNote(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --note is empty")
+	}))
+	t.Cleanup(srv.Close)
+	for _, body := range []string{"", "   "} {
+		_, _, err := runNoteCmd(t, srv.URL,
+			"note", "set", "update", "conn-1",
+			"--namespace", "test", "--set", "users", "--note", body,
+		)
+		require.Error(t, err, "note %q should be rejected", body)
+		assert.Contains(t, err.Error(), "--note must not be empty")
+	}
+}
+
+func TestNoteRecordUpdateRejectsEmptyNote(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --note is empty")
+	}))
+	t.Cleanup(srv.Close)
+	for _, body := range []string{"", "   "} {
+		_, _, err := runNoteCmd(t, srv.URL,
+			"note", "record", "update", "conn-1",
+			"--namespace", "test", "--set", "users", "--pk", "42",
+			"--pk-type", "string", "--note", body,
+		)
+		require.Error(t, err, "note %q should be rejected", body)
+		assert.Contains(t, err.Error(), "--note must not be empty")
+	}
+}
+
 func TestNoteRecordUpdateRejectsUnknownPKType(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server must not be called when --pk-type is invalid")

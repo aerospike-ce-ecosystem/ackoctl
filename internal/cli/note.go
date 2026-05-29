@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -57,6 +58,13 @@ func newNoteSetUpdateCmd(global *GlobalFlags) *cobra.Command {
 		Short: "Create or update the operator note attached to a set",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// MarkFlagRequired only checks --note was supplied, not that it
+			// carries a body. Reject empty/whitespace values so the server is
+			// never hit with a meaningless note update.
+			note = strings.TrimSpace(note)
+			if note == "" {
+				return fmt.Errorf("--note must not be empty")
+			}
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
@@ -182,6 +190,13 @@ func newNoteRecordUpdateCmd(global *GlobalFlags) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validatePKType(pkType); err != nil {
 				return err
+			}
+			// MarkFlagRequired only checks --note was supplied, not that it
+			// carries a body. Reject empty/whitespace values so the server is
+			// never hit with a meaningless note update.
+			note = strings.TrimSpace(note)
+			if note == "" {
+				return fmt.Errorf("--note must not be empty")
 			}
 			c, err := newClient(cmd, global)
 			if err != nil {

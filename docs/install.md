@@ -17,9 +17,12 @@ The script:
 
 ### Pin a version
 
+`ACKOCTL_VERSION` must be set on the `sh` process — not on `curl` — so the
+pipe target inherits it:
+
 ```bash
-ACKOCTL_VERSION=v0.1.0 \
-  curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh \
+  | ACKOCTL_VERSION=v0.1.0 sh
 ```
 
 Equivalent positional form when running the script directly:

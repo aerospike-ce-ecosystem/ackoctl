@@ -17,7 +17,7 @@
 
 Override order: **CLI flag > environment variable > config file**.
 
-Environment overrides: `ACKOCTL_CONFIG`, `ACKOCTL_CONTEXT`, `ACKOCTL_SERVER`, `ACKOCTL_TOKEN`, `ACKOCTL_WORKSPACE`.
+Environment overrides: `ACKOCTL_CONFIG`, `ACKOCTL_CONTEXT`, `ACKOCTL_SERVER`, `ACKOCTL_TOKEN`, `ACKOCTL_WORKSPACE`, `ACKOCTL_INSECURE_SKIP_TLS`.
 
 ---
 
@@ -101,6 +101,9 @@ ackoctl record get <CONN_ID> --namespace=test --set=users --pk=alice
 ackoctl record put <CONN_ID> --namespace=test --set=users --pk=alice \
   --bins='{"name":"Alice","age":30}' --ttl=3600
 ackoctl record delete <CONN_ID> --namespace=test --set=users --pk=alice --yes
+
+# Remove a single bin from a record (leaves the rest of the record intact)
+ackoctl record delete-bin <CONN_ID> --namespace=test --set=users --pk=alice --bin=temp --yes
 
 # Filtered scan — pk-pattern, predicate filters, expression all supported
 ackoctl record query <CONN_ID> \

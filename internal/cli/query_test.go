@@ -65,6 +65,20 @@ func TestParseJSONScalarNegativeNumber(t *testing.T) {
 	assert.Equal(t, -3.14, v)
 }
 
+// Numeric-looking barewords that are valid Aerospike string values but invalid
+// JSON must fall back to the raw string instead of hard-erroring. Each is not a
+// structural JSON opener, so json.Unmarshal is attempted and its failure is
+// silently absorbed.
+func TestParseJSONScalarNumericLookingStrings(t *testing.T) {
+	for _, in := range []string{"007", "1.2.3", "+5", "1_000"} {
+		t.Run(in, func(t *testing.T) {
+			v, err := parseJSONScalar(in)
+			require.NoError(t, err)
+			assert.Equal(t, in, v)
+		})
+	}
+}
+
 // ---------------------------------------------------------------------------
 // query exec predicate validation
 // ---------------------------------------------------------------------------

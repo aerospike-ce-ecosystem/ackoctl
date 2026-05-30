@@ -409,6 +409,15 @@ func parsePrivileges(specs []string) ([]client.RolePrivilege, error) {
 				if set == "" {
 					return nil, fmt.Errorf("--privilege %q: set is empty after '/'", raw)
 				}
+				// Reject an extra '/' in the set section, mirroring the
+				// namespace guard above. strings.Cut(rest, "/") folds any
+				// trailing segment into set, so "read:ns/set/extra" silently
+				// yielded set = "set/extra" — a set name Aerospike can never
+				// have. That bogus set then round-trips to cluster-manager and
+				// surfaces as a confusing server error far from the typo.
+				if strings.Contains(set, "/") {
+					return nil, fmt.Errorf("--privilege %q: set must not contain '/'", raw)
+				}
 				p.Set = set
 			}
 		}

@@ -107,6 +107,22 @@ func TestParsePrivilegesRejectsColonInNamespace(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestParsePrivilegesRejectsSlashInSet(t *testing.T) {
+	// An extra '/' in the set section must not silently fold into the set
+	// name. strings.Cut(rest, "/") keeps everything after the first '/' as
+	// the set, so these previously produced a malformed set such as
+	// "set/extra" that Aerospike can never have. Reject them client-side,
+	// mirroring the namespace ':'/'/' guard.
+	for _, spec := range []string{
+		"read:ns/set/extra",
+		"read:ns/set/",
+		"read:ns/a/b/c",
+	} {
+		_, err := parsePrivileges([]string{spec})
+		require.Error(t, err, "spec %q should be rejected", spec)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // resolvePassword
 // ---------------------------------------------------------------------------

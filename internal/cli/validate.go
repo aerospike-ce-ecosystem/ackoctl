@@ -69,14 +69,18 @@ func validateJSONObjectFlag(raw, flagName string) error {
 	if trimmed == "" {
 		return fmt.Errorf("%s must be a non-empty JSON object, e.g. '{\"name\":\"Alice\"}'", flagName)
 	}
-	if trimmed[0] != '{' {
-		// Decode into any just to surface the actual top-level JSON kind in
-		// the error — e.g. array, string, number, null — so the user can see
-		// at a glance why their input was rejected.
-		var v any
-		if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
-			return fmt.Errorf("%s must be a JSON object: %w", flagName, err)
-		}
+	// Always fully parse the input. A leading '{' is necessary but not
+	// sufficient — values such as `{"a":}` or `{bad` start with a brace yet
+	// are not valid JSON, and an earlier "first byte only" check let them
+	// through. Decode into any so we can both reject malformed input with the
+	// underlying decoder error and surface the actual top-level JSON kind
+	// (array, string, number, null, …) when the value parses but is not an
+	// object.
+	var v any
+	if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
+		return fmt.Errorf("%s must be a JSON object: %w", flagName, err)
+	}
+	if _, ok := v.(map[string]any); !ok {
 		return fmt.Errorf("%s must be a JSON object, got %s", flagName, jsonKindOf(v))
 	}
 	return nil

@@ -55,6 +55,35 @@ func TestSanitizeCellLeavesPlainTextUntouched(t *testing.T) {
 	assert.Equal(t, "already clean", sanitizeCell("already clean"))
 }
 
+func TestSanitizeCellDropsOtherControlCharacters(t *testing.T) {
+	// Vertical tab and form feed break tabwriter layout just like \n/\t and
+	// must collapse to a space; NUL and ESC can corrupt the terminal and are
+	// dropped entirely. The previous cli sanitizer left all four untouched.
+	assert.Equal(t, "a b", sanitizeCell("a\vb"))
+	assert.Equal(t, "a b", sanitizeCell("a\fb"))
+	assert.Equal(t, "ab", sanitizeCell("a\x00b"))
+	assert.Equal(t, "ab", sanitizeCell("a\x1bb"))
+	// An ANSI escape sequence (ESC [ 3 1 m) loses the ESC byte; the remaining
+	// printable bytes survive but can no longer act as a color control code.
+	assert.Equal(t, "[31mred[0m", sanitizeCell("\x1b[31mred\x1b[0m"))
+}
+
+func TestSanitizeCellCollapsesRunsOfWhitespace(t *testing.T) {
+	// A run of layout-breaking whitespace collapses to a single space so a
+	// "\n\n" or "\r\n\t" sequence does not widen the cell and shift columns.
+	assert.Equal(t, "a b", sanitizeCell("a\n\nb"))
+	assert.Equal(t, "a b", sanitizeCell("a\r\n\tb"))
+}
+
+func TestTruncateNoteDropsControlBytesBeforeCounting(t *testing.T) {
+	// truncateNote sanitizes before the rune-count truncation. Control bytes
+	// that survive sanitization would otherwise consume the rune budget and
+	// crop visible text early; verify NUL/ESC are gone and do not shorten the
+	// rendered content.
+	out := truncateNote("ab\x00cd\x1bef", 60)
+	assert.Equal(t, "abcdef", out)
+}
+
 func TestTruncateNoteSanitizesBeforeRenderingRow(t *testing.T) {
 	// A note body with an embedded newline must render on a single line so it
 	// does not corrupt the surrounding table.

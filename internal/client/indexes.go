@@ -8,6 +8,9 @@ import (
 )
 
 func (c *BaseClient) ListIndexes(ctx context.Context, connID string) ([]SecondaryIndex, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	var out []SecondaryIndex
 	if err := c.Do(ctx, http.MethodGet, "/indexes/"+url.PathEscape(connID), nil, nil, &out); err != nil {
 		return nil, err
@@ -16,6 +19,9 @@ func (c *BaseClient) ListIndexes(ctx context.Context, connID string) ([]Secondar
 }
 
 func (c *BaseClient) CreateIndex(ctx context.Context, connID string, req CreateIndexRequest) (*SecondaryIndex, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	var out SecondaryIndex
 	if err := c.Do(ctx, http.MethodPost, "/indexes/"+url.PathEscape(connID), req, nil, &out); err != nil {
 		return nil, err
@@ -24,6 +30,9 @@ func (c *BaseClient) CreateIndex(ctx context.Context, connID string, req CreateI
 }
 
 func (c *BaseClient) DeleteIndex(ctx context.Context, connID, namespace, name string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || name == "" {
 		return fmt.Errorf("namespace and name are required for index delete")
 	}

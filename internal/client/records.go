@@ -9,6 +9,9 @@ import (
 )
 
 func (c *BaseClient) ListRecords(ctx context.Context, connID, namespace, set string, pageSize int) (*RecordListResponse, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
 	}
@@ -28,6 +31,9 @@ func (c *BaseClient) ListRecords(ctx context.Context, connID, namespace, set str
 }
 
 func (c *BaseClient) GetRecord(ctx context.Context, connID, namespace, set, pk, pkType string) (*AerospikeRecord, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" || pk == "" {
 		return nil, fmt.Errorf("namespace, set, and pk are all required for record get")
 	}
@@ -46,6 +52,9 @@ func (c *BaseClient) GetRecord(ctx context.Context, connID, namespace, set, pk, 
 }
 
 func (c *BaseClient) PutRecord(ctx context.Context, connID string, req RecordWriteRequest) (*AerospikeRecord, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	var out AerospikeRecord
 	if err := c.Do(ctx, http.MethodPost, "/records/"+url.PathEscape(connID), req, nil, &out); err != nil {
 		return nil, err
@@ -54,6 +63,9 @@ func (c *BaseClient) PutRecord(ctx context.Context, connID string, req RecordWri
 }
 
 func (c *BaseClient) DeleteRecord(ctx context.Context, connID, namespace, set, pk, pkType string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" || pk == "" {
 		return fmt.Errorf("namespace, set, and pk are all required for record delete")
 	}
@@ -73,6 +85,9 @@ func (c *BaseClient) DeleteRecord(ctx context.Context, connID, namespace, set, p
 // matches standard Aerospike semantics and the cluster-manager docstring.
 // “pkType“ defaults to “auto“ on the server when empty.
 func (c *BaseClient) DeleteBin(ctx context.Context, connID, namespace, set, pk, binName, pkType string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" || pk == "" || binName == "" {
 		return fmt.Errorf("namespace, set, pk, and bin are all required for record delete-bin")
 	}
@@ -89,6 +104,9 @@ func (c *BaseClient) DeleteBin(ctx context.Context, connID, namespace, set, pk, 
 }
 
 func (c *BaseClient) FilterRecords(ctx context.Context, connID string, req FilteredQueryRequest) (*FilteredQueryResponse, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	var out FilteredQueryResponse
 	if err := c.Do(ctx, http.MethodPost, "/records/"+url.PathEscape(connID)+"/filter", req, nil, &out); err != nil {
 		return nil, err

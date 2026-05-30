@@ -172,3 +172,15 @@ func TestFilterRecordsPostsBodyAndDecodes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 100, resp.ScannedRecords)
 }
+
+func TestRecordMethodsRequireConnID(t *testing.T) {
+	c, _ := newTestClient(t, func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when connID is empty")
+	})
+
+	_, err := c.GetRecord(context.Background(), "", "test", "users", "1", "")
+	require.Error(t, err, "empty connID must be rejected client-side")
+
+	err = c.DeleteRecord(context.Background(), "", "test", "users", "1", "")
+	require.Error(t, err, "empty connID must be rejected client-side")
+}

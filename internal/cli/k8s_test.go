@@ -308,7 +308,7 @@ func TestSplitNamespacedName(t *testing.T) {
 // NAMESPACE/NAME argument and never reaches the network.
 func TestK8sCommandRejectsExtraPathSegment(t *testing.T) {
 	hit := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		hit = true
 		w.WriteHeader(http.StatusOK)
 	}))

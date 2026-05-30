@@ -198,6 +198,27 @@ func TestAdminUserCreateUsesExplicitPassword(t *testing.T) {
 	assert.Equal(t, []any{"read"}, body["roles"])
 }
 
+func TestAdminUserCreateStripsBlankRoles(t *testing.T) {
+	// A trailing comma in --roles (read,) splits into ["read", ""] via cobra's
+	// StringSliceVar. The empty entry must be dropped before the request lands
+	// so the server never sees a meaningless empty role name.
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"username":"alice","roles":["read","write"],"readQuota":0,"writeQuota":0,"connections":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runAdminCmd(t, srv.URL, "",
+		"admin", "user", "create", "conn-1",
+		"--username", "alice", "--password", "s3cret",
+		"--roles", "read, ,write,",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []any{"read", "write"}, body["roles"])
+}
+
 func TestAdminUserCreateReadsPasswordFromStdin(t *testing.T) {
 	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -350,6 +371,48 @@ func TestAdminRoleCreateSendsParsedPrivileges(t *testing.T) {
 	assert.Equal(t, "users", p1["set"])
 	assert.Equal(t, float64(100), body["readQuota"])
 	assert.Equal(t, float64(50), body["writeQuota"])
+}
+
+func TestAdminRoleCreateStripsBlankWhitelist(t *testing.T) {
+	// A trailing comma in --whitelist (10.0.0.0/8,) splits into
+	// ["10.0.0.0/8", ""] via cobra's StringSliceVar. The empty CIDR must be
+	// dropped before the request lands so the server never sees a blank entry.
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"name":"r","privileges":[{"code":"read"}],"whitelist":["10.0.0.0/8"],"readQuota":0,"writeQuota":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runAdminCmd(t, srv.URL, "",
+		"admin", "role", "create", "conn-1",
+		"--name", "r", "--privilege", "read",
+		"--whitelist", "10.0.0.0/8, ,192.168.0.0/16,",
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []any{"10.0.0.0/8", "192.168.0.0/16"}, body["whitelist"])
+}
+
+func TestAdminRoleCreateOmitsAllBlankWhitelist(t *testing.T) {
+	// An all-blank --whitelist collapses to nil, so omitempty drops the field
+	// entirely rather than forwarding [""] to the server.
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"name":"r","privileges":[{"code":"read"}],"whitelist":[],"readQuota":0,"writeQuota":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runAdminCmd(t, srv.URL, "",
+		"admin", "role", "create", "conn-1",
+		"--name", "r", "--privilege", "read",
+		"--whitelist", " , ",
+	)
+	require.NoError(t, err)
+	_, hasWL := body["whitelist"]
+	assert.False(t, hasWL, "all-blank --whitelist must not serialise")
 }
 
 func TestAdminRoleCreateOmitsUnsetQuotas(t *testing.T) {

@@ -118,7 +118,10 @@ func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
 			out, err := c.CreateAdminUser(cmd.Context(), args[0], client.CreateUserRequest{
 				Username: username,
 				Password: pw,
-				Roles:    roles,
+				// Drop blank/whitespace entries (e.g. a trailing comma in
+				// --roles read,) so the server is never handed an empty role
+				// name that surfaces as a confusing 422.
+				Roles: cleanStringSlice(roles),
 			})
 			if err != nil {
 				return err
@@ -300,7 +303,10 @@ privileges to one role.`,
 			req := client.CreateRoleRequest{
 				Name:       name,
 				Privileges: privs,
-				Whitelist:  whitelist,
+				// Drop blank/whitespace entries (e.g. a trailing comma in
+				// --whitelist 10.0.0.0/8,) so a stray empty CIDR is never
+				// forwarded to the server.
+				Whitelist: cleanStringSlice(whitelist),
 			}
 			if cmd.Flags().Changed("read-quota") {
 				if readQuota <= 0 {

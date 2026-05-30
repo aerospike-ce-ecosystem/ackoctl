@@ -333,13 +333,7 @@ func sanitizeHosts(hosts []string) ([]string, error) {
 	if len(hosts) == 0 {
 		return nil, nil
 	}
-	out := make([]string, 0, len(hosts))
-	for _, h := range hosts {
-		h = strings.TrimSpace(h)
-		if h != "" {
-			out = append(out, h)
-		}
-	}
+	out := cleanStringSlice(hosts)
 	if len(out) == 0 {
 		return nil, fmt.Errorf("--host must contain at least one non-empty value")
 	}

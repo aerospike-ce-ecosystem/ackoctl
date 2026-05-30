@@ -204,3 +204,24 @@ func TestValidatePKMatchModeRejectsUnknown(t *testing.T) {
 		assert.Contains(t, err.Error(), "exact|prefix|regex")
 	}
 }
+
+func TestCleanStringSlice(t *testing.T) {
+	cases := []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"nil stays nil", nil, nil},
+		{"empty stays nil", []string{}, nil},
+		{"trims surrounding whitespace", []string{" read ", "\twrite\n"}, []string{"read", "write"}},
+		{"drops blank entry from trailing comma", []string{"read", ""}, []string{"read"}},
+		{"drops whitespace-only entries", []string{"read", "   "}, []string{"read"}},
+		{"all-blank collapses to nil", []string{"", "  ", "\t"}, nil},
+		{"preserves order and clean entries", []string{"10.0.0.0/8", "192.168.0.0/16"}, []string{"10.0.0.0/8", "192.168.0.0/16"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, cleanStringSlice(tc.in))
+		})
+	}
+}

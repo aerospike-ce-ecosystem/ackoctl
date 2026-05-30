@@ -128,6 +128,32 @@ func jsonKindOf(v any) string {
 	}
 }
 
+// cleanStringSlice trims surrounding whitespace from each entry and drops the
+// ones that are empty afterwards. It is the non-erroring counterpart of
+// sanitizeHosts, intended for optional repeatable/comma-separated flags such as
+// `admin user create --roles` and `admin role create --whitelist`: a stray
+// trailing comma (`--roles read,`) or padded value otherwise forwards an empty
+// or space-only entry to cluster-manager, which surfaces as a confusing 422.
+// A nil/empty input returns nil so the request keeps omitting the field (the
+// wire types tag these as omitempty), and an input that is entirely blank also
+// collapses to nil rather than [""].
+func cleanStringSlice(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	for _, s := range in {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // validatePKMatchMode rejects a `record query --pk-match-mode` value that is
 // not one of the modes cluster-manager accepts. An empty string means "not
 // supplied" and is allowed — the server defaults it to "exact". Without this

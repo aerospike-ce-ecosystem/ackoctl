@@ -175,6 +175,49 @@ func TestRecordPutRejectsNonObjectBins(t *testing.T) {
 	}
 }
 
+func TestRecordPutRejectsTTLBelowSentinel(t *testing.T) {
+	// -1 (never expire) and 0 (namespace default) are valid sentinels; only
+	// values below -1 are nonsensical and must be rejected before the request
+	// is built. Mirrors #70's privilege guard for numeric flags.
+	for _, ttl := range []string{"-2", "-100"} {
+		t.Run("ttl="+ttl, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --ttl is below -1")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "put", "conn-1",
+				"--namespace", "test", "--set", "s", "--pk", "k",
+				"--bins", `{"foo":1}`, "--ttl", ttl,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--ttl must be")
+		})
+	}
+}
+
+func TestRecordPutAcceptsValidTTL(t *testing.T) {
+	// -1, 0, and a positive value must all reach the server.
+	for _, ttl := range []string{"-1", "0", "3600"} {
+		t.Run("ttl="+ttl, func(t *testing.T) {
+			called := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				called = true
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"key":{"namespace":"test","set":"s","pk":"k"},"bins":{"foo":1}}`))
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runRecordCmd(t, srv.URL,
+				"record", "put", "conn-1",
+				"--namespace", "test", "--set", "s", "--pk", "k",
+				"--bins", `{"foo":1}`, "--ttl", ttl,
+			)
+			require.NoError(t, err)
+			assert.True(t, called, "server should be called for valid --ttl=%s", ttl)
+		})
+	}
+}
+
 func TestRecordPutAcceptsJSONObjectBins(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)

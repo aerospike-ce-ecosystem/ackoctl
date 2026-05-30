@@ -60,6 +60,12 @@ Destructive: requires --yes/-y to proceed.`,
 			}
 			var lutPtr *int64
 			if cmd.Flags().Changed("before-lut") {
+				// Server rejects before_lut=0 as ambiguous and a negative
+				// nanosecond cutoff is meaningless; fail fast client-side so the
+				// error lands next to the typo rather than after a round-trip.
+				if beforeLut <= 0 {
+					return fmt.Errorf("--before-lut must be a positive nanosecond timestamp (omit for a full truncate); got %d", beforeLut)
+				}
 				v := beforeLut
 				lutPtr = &v
 			}

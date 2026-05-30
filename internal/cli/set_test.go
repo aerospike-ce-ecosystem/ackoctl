@@ -184,6 +184,26 @@ func TestSetTruncateParsesBeforeLut(t *testing.T) {
 	assert.Contains(t, stderr, "lut=1700000000000000000")
 }
 
+func TestSetTruncateRejectsNonPositiveBeforeLut(t *testing.T) {
+	// The server rejects before_lut=0 as ambiguous and a negative cutoff is
+	// meaningless; both must fail client-side before any HTTP request fires.
+	for _, lut := range []string{"0", "-1", "-1700000000000000000"} {
+		t.Run("beforeLut="+lut, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --before-lut is not positive")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runSetCmd(t, srv.URL,
+				"set", "truncate", "conn-1",
+				"--namespace", "test", "--set", "users",
+				"--before-lut", lut, "--yes",
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--before-lut must be a positive")
+		})
+	}
+}
+
 func TestSetTruncateRequiresNamespaceAndSet(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("unexpected server call with missing required flags")

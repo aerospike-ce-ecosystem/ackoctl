@@ -21,6 +21,9 @@ import (
 // The endpoint returns either “{"message": "..."}“ or “204 No Content“;
 // either is treated as success and the body is discarded.
 func (c *BaseClient) TruncateSet(ctx context.Context, connID, namespace, setName string, beforeLut *int64) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || setName == "" {
 		return fmt.Errorf("namespace and set name are required for set truncate")
 	}

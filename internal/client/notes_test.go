@@ -177,6 +177,22 @@ func TestListRecordNotesRequiresNsAndSet(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNotesMethodsRequireConnID(t *testing.T) {
+	c, _ := newTestClient(t, func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when connID is empty")
+	})
+	_, err := c.UpsertSetNote(context.Background(), "", "test", "users", "hello")
+	require.Error(t, err)
+	require.Error(t, c.DeleteSetNote(context.Background(), "", "test", "users"))
+	_, err = c.ListSetNotes(context.Background(), "", "test")
+	require.Error(t, err)
+	_, err = c.UpsertRecordNote(context.Background(), "", "test", "users", "alice", "string", "vip")
+	require.Error(t, err)
+	require.Error(t, c.DeleteRecordNote(context.Background(), "", "test", "users", "alice", "int"))
+	_, err = c.ListRecordNotes(context.Background(), "", "test", "users")
+	require.Error(t, err)
+}
+
 func TestNotePathSegmentsAreEscaped(t *testing.T) {
 	// Set names allow special characters in Aerospike (within limits); ensure
 	// we escape rather than truncate at the slash.

@@ -12,6 +12,9 @@ import (
 // DeleteSetNote to remove a note explicitly — the previous "PUT empty
 // string ⇒ delete" shortcut was a footgun and has been removed server-side.
 func (c *BaseClient) UpsertSetNote(ctx context.Context, connID, namespace, set, note string) (*SetNote, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" {
 		return nil, fmt.Errorf("namespace and set are required for set note upsert")
 	}
@@ -26,6 +29,9 @@ func (c *BaseClient) UpsertSetNote(ctx context.Context, connID, namespace, set, 
 // DeleteSetNote removes the note for (conn, namespace, set). The endpoint
 // is idempotent — deleting a non-existent note returns 204.
 func (c *BaseClient) DeleteSetNote(ctx context.Context, connID, namespace, set string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" {
 		return fmt.Errorf("namespace and set are required for set note delete")
 	}
@@ -37,6 +43,9 @@ func (c *BaseClient) DeleteSetNote(ctx context.Context, connID, namespace, set s
 // filtered by namespace. An empty “namespace“ returns notes across all
 // namespaces visible to the caller.
 func (c *BaseClient) ListSetNotes(ctx context.Context, connID, namespace string) ([]SetNote, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	q := url.Values{}
 	if namespace != "" {
 		q.Set("namespace", namespace)
@@ -54,6 +63,9 @@ func (c *BaseClient) ListSetNotes(ctx context.Context, connID, namespace string)
 // explicit “pkType“ for digit-only string keys to avoid INTEGER
 // mis-classification.
 func (c *BaseClient) UpsertRecordNote(ctx context.Context, connID, namespace, set, pk, pkType, note string) (*RecordNote, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" || pk == "" {
 		return nil, fmt.Errorf("namespace, set, and pk are required for record note upsert")
 	}
@@ -69,6 +81,9 @@ func (c *BaseClient) UpsertRecordNote(ctx context.Context, connID, namespace, se
 // DeleteRecordNote removes the record note. “pkType“ defaults to “auto“
 // when empty — matching server behaviour. The endpoint is idempotent.
 func (c *BaseClient) DeleteRecordNote(ctx context.Context, connID, namespace, set, pk, pkType string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" || pk == "" {
 		return fmt.Errorf("namespace, set, and pk are required for record note delete")
 	}
@@ -84,6 +99,9 @@ func (c *BaseClient) DeleteRecordNote(ctx context.Context, connID, namespace, se
 // Both namespace and set are required — this is the recovery path for
 // notes that the random-50 data browser scan does not surface.
 func (c *BaseClient) ListRecordNotes(ctx context.Context, connID, namespace, set string) ([]RecordNote, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if namespace == "" || set == "" {
 		return nil, fmt.Errorf("namespace and set are required for record notes list")
 	}

@@ -292,7 +292,7 @@ Note: --since is applied client-side after fetching; the REST endpoint has no
 							e.Type,
 							e.Reason,
 							e.Category,
-							e.Message,
+							sanitizeCell(e.Message),
 							e.LastTimestamp,
 							strconv.Itoa(e.Count),
 						}

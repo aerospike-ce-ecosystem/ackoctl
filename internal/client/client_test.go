@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -227,6 +228,20 @@ func TestK8sListAndReconcile(t *testing.T) {
 	out, err := c.ForceReconcileK8sCluster(context.Background(), "ns", "c1")
 	require.NoError(t, err)
 	assert.Equal(t, "Reconciling", out["phase"])
+}
+
+func TestTruncateShortStringUnchanged(t *testing.T) {
+	assert.Equal(t, "hello", truncate("hello", 10))
+}
+
+func TestTruncateIsRuneAwareNotByteAware(t *testing.T) {
+	// Korean characters are 3 bytes each in UTF-8. Byte-slicing s[:n] would
+	// cut mid-codepoint and emit an invalid UTF-8 string. truncate must crop
+	// on rune boundaries so the result stays valid UTF-8.
+	in := "가나다라마바사" // 7 runes, 21 bytes
+	out := truncate(in, 3)
+	assert.Equal(t, "가나다...", out)
+	assert.True(t, utf8.ValidString(out), "truncated output must be valid UTF-8")
 }
 
 func readAll(r *http.Request) ([]byte, error) {

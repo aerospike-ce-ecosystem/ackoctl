@@ -144,6 +144,13 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 				PKType: pkType,
 			}
 			if cmd.Flags().Changed("ttl") {
+				// 0 = namespace default; -1 is the Aerospike "never expire"
+				// sentinel that cluster-manager/aerospike-py may honor, so it
+				// is allowed through. Anything below -1 is meaningless and only
+				// produces a confusing server-side error, so reject it here.
+				if ttl < -1 {
+					return fmt.Errorf("--ttl must be -1 (never expire), 0 (namespace default), or a positive number of seconds; got %d", ttl)
+				}
 				v := ttl
 				req.TTL = &v
 			}
@@ -167,7 +174,7 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&pk, "pk", "", "primary key (required)")
 	cmd.Flags().StringVar(&binsJSON, "bins", "", "bins as a JSON object, e.g. '{\"name\":\"Alice\",\"age\":30}' (required)")
 	cmd.Flags().StringVar(&pkType, "pk-type", "", "particle type for pk: auto|string|int|bytes (default auto)")
-	cmd.Flags().IntVar(&ttl, "ttl", 0, "record TTL in seconds (0 = use namespace default, omitted = server default)")
+	cmd.Flags().IntVar(&ttl, "ttl", 0, "record TTL in seconds (-1 = never expire, 0 = use namespace default, omitted = server default)")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")

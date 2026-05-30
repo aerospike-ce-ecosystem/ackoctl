@@ -372,6 +372,33 @@ func TestAdminRoleCreateOmitsUnsetQuotas(t *testing.T) {
 	assert.False(t, hasWQ, "unset --write-quota must not serialise")
 }
 
+func TestAdminRoleCreateRejectsNonPositiveQuotas(t *testing.T) {
+	// A zero or negative TPS quota is nonsensical; reject it client-side when
+	// explicitly set, mirroring #70's numeric-flag guard.
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"read-quota=0", []string{"--read-quota", "0"}, "--read-quota must be a positive"},
+		{"read-quota=-5", []string{"--read-quota", "-5"}, "--read-quota must be a positive"},
+		{"write-quota=0", []string{"--write-quota", "0"}, "--write-quota must be a positive"},
+		{"write-quota=-1", []string{"--write-quota", "-1"}, "--write-quota must be a positive"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when a quota flag is not positive")
+			}))
+			t.Cleanup(srv.Close)
+			args := append([]string{"admin", "role", "create", "conn-1", "--name", "r", "--privilege", "read"}, tc.args...)
+			_, _, err := runAdminCmd(t, srv.URL, "", args...)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
 func TestAdminRoleCreateRejectsInvalidPrivilege(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server should not be hit on client-side parse error")

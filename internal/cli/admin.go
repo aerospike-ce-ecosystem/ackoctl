@@ -303,10 +303,16 @@ privileges to one role.`,
 				Whitelist:  whitelist,
 			}
 			if cmd.Flags().Changed("read-quota") {
+				if readQuota <= 0 {
+					return fmt.Errorf("--read-quota must be a positive TPS value; got %d", readQuota)
+				}
 				v := readQuota
 				req.ReadQuota = &v
 			}
 			if cmd.Flags().Changed("write-quota") {
+				if writeQuota <= 0 {
+					return fmt.Errorf("--write-quota must be a positive TPS value; got %d", writeQuota)
+				}
 				v := writeQuota
 				req.WriteQuota = &v
 			}

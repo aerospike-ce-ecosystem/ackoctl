@@ -133,6 +133,68 @@ func TestClusterConfigureNamespaceRejectsEmptyParamKey(t *testing.T) {
 	assert.Contains(t, err.Error(), "key must not be empty")
 }
 
+// A repeated --param key silently overwrote the earlier value before this
+// guard (--param x=1 --param x=2 quietly dropped x=1). The duplicate must be
+// rejected before any HTTP call, while distinct params still round-trip into
+// the request body.
+func TestClusterConfigureNamespaceParamDuplicates(t *testing.T) {
+	tests := []struct {
+		name     string
+		params   []string
+		wantErr  string         // non-empty => expect this substring, no HTTP call
+		wantBody map[string]any // checked on success
+	}{
+		{
+			name:    "duplicate key rejected",
+			params:  []string{"ttl=100", "ttl=200"},
+			wantErr: `--param "ttl" specified more than once`,
+		},
+		{
+			name:     "distinct keys round-trip",
+			params:   []string{"ttl=100", "stop-writes-pct=90"},
+			wantBody: map[string]any{"name": "test", "ttl": "100", "stop-writes-pct": "90"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var got map[string]any
+			called := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"message":"ok"}`))
+			}))
+			t.Cleanup(srv.Close)
+
+			root := NewRootCmd()
+			root.SetOut(&bytes.Buffer{})
+			root.SetErr(&bytes.Buffer{})
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("ACKOCTL_SERVER", srv.URL)
+			t.Setenv("ACKOCTL_TOKEN", "test-token")
+			args := []string{"cluster", "configure-namespace", "conn-1", "--name", "test"}
+			for _, p := range tc.params {
+				args = append(args, "--param", p)
+			}
+			root.SetArgs(args)
+			root.SetContext(context.Background())
+			err := root.Execute()
+
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				assert.False(t, called, "duplicate guard must reject before any HTTP call")
+				return
+			}
+			require.NoError(t, err)
+			assert.True(t, called, "distinct params should reach the server")
+			assert.Equal(t, tc.wantBody, got)
+		})
+	}
+}
+
 func TestClusterConfigureNamespaceRequiresAtLeastOneParam(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server must not be called when no --param is supplied")

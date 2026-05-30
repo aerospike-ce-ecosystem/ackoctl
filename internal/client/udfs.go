@@ -12,6 +12,9 @@ import (
 // “udf-list“ info call to a random node and parses the response into
 // “UDFModule“ records.
 func (c *BaseClient) ListUDFs(ctx context.Context, connID string) ([]UDFModule, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	var out []UDFModule
 	if err := c.Do(ctx, http.MethodGet, "/udfs/"+url.PathEscape(connID), nil, nil, &out); err != nil {
 		return nil, err
@@ -25,6 +28,9 @@ func (c *BaseClient) ListUDFs(ctx context.Context, connID string) ([]UDFModule, 
 // module name) and calls “udf_put“ under the hood. “filename“ must match
 // “^[a-zA-Z0-9_.-]{1,255}$“ — violations come back as a 422 APIError.
 func (c *BaseClient) UploadUDF(ctx context.Context, connID, filename, content string) (*UDFModule, error) {
+	if connID == "" {
+		return nil, fmt.Errorf("connID is required")
+	}
 	if filename == "" {
 		return nil, fmt.Errorf("filename is required for udf upload")
 	}
@@ -43,6 +49,9 @@ func (c *BaseClient) UploadUDF(ctx context.Context, connID, filename, content st
 // surfaced as a 404 APIError by the server's “AerospikeError“ mapping;
 // the call is otherwise idempotent for callers that swallow that case.
 func (c *BaseClient) RemoveUDF(ctx context.Context, connID, filename string) error {
+	if connID == "" {
+		return fmt.Errorf("connID is required")
+	}
 	if filename == "" {
 		return fmt.Errorf("filename is required for udf remove")
 	}

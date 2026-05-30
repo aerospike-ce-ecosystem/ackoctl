@@ -64,3 +64,15 @@ func TestDeleteIndexRequiresFields(t *testing.T) {
 	err = c.DeleteIndex(context.Background(), "conn-1", "test", "")
 	require.Error(t, err, "empty index name must be rejected client-side")
 }
+
+func TestIndexMethodsRequireConnID(t *testing.T) {
+	c, _ := newTestClient(t, func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when connID is empty")
+	})
+
+	_, err := c.ListIndexes(context.Background(), "")
+	require.Error(t, err, "empty connID must be rejected client-side")
+
+	err = c.DeleteIndex(context.Background(), "", "test", "idx_name")
+	require.Error(t, err, "empty connID must be rejected client-side")
+}

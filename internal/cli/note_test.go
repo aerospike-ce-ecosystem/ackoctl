@@ -36,8 +36,31 @@ func TestTruncateNoteRespectsRunesNotBytes(t *testing.T) {
 }
 
 func TestTruncateNoteZeroLimitReturnsInput(t *testing.T) {
-	// limit <= 0 means "do not truncate" — caller opts out of cropping.
-	assert.Equal(t, "hello", truncateNote("hello", 0))
+	// limit <= 0 means "do not truncate" — caller opts out of cropping, but
+	// sanitization still applies so the value stays on one table row.
+	assert.Equal(t, "a b", truncateNote("a\nb", 0))
+}
+
+func TestSanitizeCellCollapsesNewlinesAndTabs(t *testing.T) {
+	// Embedded \r\n, \n and \t would split a single logical cell across rows
+	// or break tabwriter column alignment. Each is replaced with one space.
+	assert.Equal(t, "a b", sanitizeCell("a\nb"))
+	assert.Equal(t, "a b", sanitizeCell("a\tb"))
+	assert.Equal(t, "a b", sanitizeCell("a\r\nb"))
+	assert.Equal(t, "line1 line2 col", sanitizeCell("line1\nline2\tcol"))
+}
+
+func TestSanitizeCellLeavesPlainTextUntouched(t *testing.T) {
+	assert.Equal(t, "", sanitizeCell(""))
+	assert.Equal(t, "already clean", sanitizeCell("already clean"))
+}
+
+func TestTruncateNoteSanitizesBeforeRenderingRow(t *testing.T) {
+	// A note body with an embedded newline must render on a single line so it
+	// does not corrupt the surrounding table.
+	out := truncateNote("a\nb", 60)
+	assert.Equal(t, "a b", out)
+	assert.False(t, strings.Contains(out, "\n"), "rendered cell must not contain a newline")
 }
 
 // runNoteCmd is a thin harness that wires the note command against an

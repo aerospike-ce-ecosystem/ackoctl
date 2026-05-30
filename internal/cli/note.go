@@ -311,10 +311,29 @@ scan does not surface — it returns every annotated record key for the slice.`,
 	return cmd
 }
 
-// truncateNote shortens a note body to “limit“ runes (not bytes) and
-// appends an ellipsis when truncation occurs. Operating on runes keeps
-// multibyte UTF-8 (e.g. Korean) from getting sliced mid-codepoint.
+// sanitizeCell flattens a free-text value into a single tabwriter-safe line.
+// Embedded carriage returns, newlines, and tabs would otherwise break column
+// alignment (or split a single logical cell across rows) in `-o table` output.
+// JSON/YAML paths must NOT use this — they preserve the original value.
+func sanitizeCell(s string) string {
+	if s == "" {
+		return s
+	}
+	replacer := strings.NewReplacer(
+		"\r\n", " ",
+		"\r", " ",
+		"\n", " ",
+		"\t", " ",
+	)
+	return replacer.Replace(s)
+}
+
+// truncateNote shortens a note body to “limit“ runes (not bytes), sanitizes
+// embedded newlines/tabs so it stays on one table row, and appends an ellipsis
+// when truncation occurs. Operating on runes keeps multibyte UTF-8 (e.g.
+// Korean) from getting sliced mid-codepoint.
 func truncateNote(s string, limit int) string {
+	s = sanitizeCell(s)
 	if limit <= 0 {
 		return s
 	}

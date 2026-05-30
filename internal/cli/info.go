@@ -79,7 +79,7 @@ forward any verb including write-capable ones such as set-config:.`,
 							r.Node,
 							r.Command,
 							truncateNote(r.Output, infoOutputLimit),
-							errStr,
+							sanitizeCell(errStr),
 						}
 					},
 					func(v any) []any {

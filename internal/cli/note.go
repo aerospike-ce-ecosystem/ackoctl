@@ -313,19 +313,46 @@ scan does not surface — it returns every annotated record key for the slice.`,
 
 // sanitizeCell flattens a free-text value into a single tabwriter-safe line.
 // Embedded carriage returns, newlines, and tabs would otherwise break column
-// alignment (or split a single logical cell across rows) in `-o table` output.
+// alignment (or split a single logical cell across rows) in `-o table` output;
+// other control bytes (NUL, ESC, vertical tab, form feed) can corrupt the
+// terminal. Each run of layout-breaking whitespace (\t \n \r \v \f) collapses
+// to a single space, and any remaining control character is dropped. This
+// mirrors output.sanitizeCell so the two never diverge — the output layer
+// re-sanitizes every table cell, but truncateNote runs this first, so leaving
+// it weaker would let control bytes consume the rune budget before truncation.
 // JSON/YAML paths must NOT use this — they preserve the original value.
 func sanitizeCell(s string) string {
-	if s == "" {
+	if !strings.ContainsFunc(s, isControlCellRune) {
 		return s
 	}
-	replacer := strings.NewReplacer(
-		"\r\n", " ",
-		"\r", " ",
-		"\n", " ",
-		"\t", " ",
-	)
-	return replacer.Replace(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	prevSpace := false
+	for _, r := range s {
+		switch {
+		case r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f':
+			if !prevSpace {
+				b.WriteByte(' ')
+				prevSpace = true
+			}
+		case r != ' ' && (r < 0x20 || r == 0x7f):
+			// Drop other control characters (e.g. NUL, ESC) entirely.
+		default:
+			b.WriteRune(r)
+			prevSpace = false
+		}
+	}
+	return b.String()
+}
+
+// isControlCellRune reports whether r is a control character that would corrupt
+// tabwriter layout or the terminal if emitted verbatim in a table cell. A
+// regular space is excluded so already-clean text takes the fast path.
+func isControlCellRune(r rune) bool {
+	if r == ' ' {
+		return false
+	}
+	return r < 0x20 || r == 0x7f
 }
 
 // truncateNote shortens a note body to “limit“ runes (not bytes), sanitizes

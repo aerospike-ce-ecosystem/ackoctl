@@ -125,13 +125,20 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 // `[1,2]`, `{"k":1}`) or an unquoted bareword that we treat as a plain
 // string for UX (`--value alice`).
 //
-// When the input *looks* like JSON (starts with a JSON literal opener) but
-// fails to parse, we surface the error instead of silently downgrading to a
-// string, so a typo like `--value '[1,2'` does not end up as the literal
-// string predicate `"[1,2"` on the server.
+// Only *structural* JSON openers (`{`, `[`, `"`) are required to parse as
+// valid JSON. For those, a parse failure is surfaced as an error instead of
+// silently downgrading to a string, so a typo like `--value '[1,2'` does not
+// end up as the literal string predicate `"[1,2"` on the server.
+//
+// Any other input is offered to json.Unmarshal opportunistically — so `30`
+// still becomes a number and `true`/`null` still parse — but on failure it
+// falls back to the raw string. This keeps numeric-looking barewords that are
+// valid Aerospike string values but invalid JSON (leading zeros like `007`,
+// dotted ids like `1.2.3`, `+5`, `1_000`) as plain strings rather than
+// hard-erroring.
 func parseJSONScalar(s string) (any, error) {
 	trimmed := strings.TrimSpace(s)
-	if looksLikeJSON(trimmed) {
+	if looksLikeStructuredJSON(trimmed) {
 		var v any
 		if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
 			return nil, fmt.Errorf("looks like JSON but did not parse: %w", err)
@@ -145,7 +152,10 @@ func parseJSONScalar(s string) (any, error) {
 	return s, nil
 }
 
-func looksLikeJSON(s string) bool {
+// looksLikeStructuredJSON reports whether s opens with a structural JSON token
+// (`{`, `[`, or `"`). These openers commit the input to being valid JSON, so a
+// parse failure is a real error rather than a string fallback.
+func looksLikeStructuredJSON(s string) bool {
 	if s == "" {
 		return false
 	}
@@ -153,20 +163,5 @@ func looksLikeJSON(s string) bool {
 	case '{', '[', '"':
 		return true
 	}
-	// JSON literals: true/false/null.
-	switch s {
-	case "true", "false", "null":
-		return true
-	}
-	// Numeric: leading digit, minus, or plus sign followed by a digit or dot.
-	c := s[0]
-	if c == '-' || c == '+' {
-		if len(s) > 1 && (isDigit(s[1]) || s[1] == '.') {
-			return true
-		}
-		return false
-	}
-	return isDigit(c)
+	return false
 }
-
-func isDigit(c byte) bool { return c >= '0' && c <= '9' }

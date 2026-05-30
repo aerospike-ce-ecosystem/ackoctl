@@ -89,6 +89,14 @@ Namespaces cannot be created at runtime — they must be defined in aerospike.co
 				if k == "name" {
 					return fmt.Errorf("--param name=... is reserved; use --name to set the namespace")
 				}
+				// A repeated key would silently overwrite the earlier value
+				// (--param x=1 --param x=2 quietly drops x=1). For a config
+				// mutation that is a foot-gun, so reject the collision instead.
+				// The pre-seeded "name" key is unreachable here — it is caught
+				// by the reserved-key guard above — so this never false-fires.
+				if _, dup := req[k]; dup {
+					return fmt.Errorf("--param %q specified more than once", k)
+				}
 				req[k] = v
 			}
 			c, err := newClient(cmd, global)

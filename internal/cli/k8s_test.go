@@ -267,3 +267,65 @@ func TestK8sClusterScaleProceedsWhenUnresolvableButYesGiven(t *testing.T) {
 	require.NoError(t, root.Execute())
 	assert.True(t, scalePosted, "--yes must allow the scale to proceed despite an unconfirmed current size")
 }
+
+func TestSplitNamespacedName(t *testing.T) {
+	tests := []struct {
+		name      string
+		arg       string
+		wantNS    string
+		wantName  string
+		wantError bool
+	}{
+		{"valid", "ns/c1", "ns", "c1", false},
+		{"name with dashes", "default/my-cluster", "default", "my-cluster", false},
+		{"missing slash", "c1", "", "", true},
+		{"empty namespace", "/c1", "", "", true},
+		{"empty name", "ns/", "", "", true},
+		{"empty input", "", "", "", true},
+		// strings.Cut would fold the trailing segment into name
+		// ("ns/c1/extra" -> name="c1/extra"); that bogus name path-escapes to
+		// "%2F" and surfaces as a confusing server 404. Reject it client-side.
+		{"extra segment", "ns/c1/extra", "", "", true},
+		{"trailing slash", "ns/c1/", "", "", true},
+		{"double slash", "ns//c1", "", "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ns, name, err := splitNamespacedName(tt.arg)
+			if tt.wantError {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantNS, ns)
+			assert.Equal(t, tt.wantName, name)
+		})
+	}
+}
+
+// TestK8sCommandRejectsExtraPathSegment is an end-to-end guard that the
+// scale command surfaces a clear client-side error for a malformed
+// NAMESPACE/NAME argument and never reaches the network.
+func TestK8sCommandRejectsExtraPathSegment(t *testing.T) {
+	hit := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	root := NewRootCmd()
+	var errBuf bytes.Buffer
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&errBuf)
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ACKOCTL_SERVER", srv.URL)
+	t.Setenv("ACKOCTL_TOKEN", "test-token")
+	root.SetArgs([]string{"k8s", "cluster", "scale", "ns/c1/extra", "--size", "2", "--yes"})
+	root.SetContext(context.Background())
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "expected NAMESPACE/NAME")
+	assert.False(t, hit, "a malformed NAMESPACE/NAME must fail before any network call")
+}

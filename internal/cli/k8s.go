@@ -507,9 +507,19 @@ func rackIDField(rid *int) string {
 	return strconv.Itoa(*rid)
 }
 
+// splitNamespacedName parses a "NAMESPACE/NAME" argument into its two parts.
+//
+// It splits on the single, required '/' separator. A Kubernetes namespace and
+// object name can never themselves contain a '/', so an argument carrying more
+// than one slash (e.g. "ns/name/extra" or a trailing "ns/name/") is a user
+// mistake and is rejected. strings.Cut alone would silently fold the extra
+// segment into name ("ns/name/extra" -> name="name/extra"); that bogus name
+// then round-trips as a path-escaped "%2F" segment to cluster-manager, where
+// it surfaces as a confusing 404 far from the real cause. Failing fast here
+// gives the user an actionable error pointing at the malformed argument.
 func splitNamespacedName(s string) (string, string, error) {
 	ns, name, ok := strings.Cut(s, "/")
-	if !ok || ns == "" || name == "" {
+	if !ok || ns == "" || name == "" || strings.Contains(name, "/") {
 		return "", "", fmt.Errorf("expected NAMESPACE/NAME, got %q", s)
 	}
 	return ns, name, nil

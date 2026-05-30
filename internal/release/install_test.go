@@ -237,6 +237,57 @@ func TestReplaceSameFs(t *testing.T) {
 	}
 }
 
+// TestCopyReplaceWritesFullContent exercises Replace's cross-device fallback
+// directly. On a single filesystem Replace short-circuits via os.Rename, so
+// the copy-then-fsync-then-rename path that runs on EXDEV (kind, tmpfs
+// overlays) is otherwise never covered. We assert the destination ends up
+// with the complete source bytes, the mode is 0755, and the temp file is not
+// left behind.
+func TestCopyReplaceWritesFullContent(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "new")
+	dst := filepath.Join(dir, "current")
+
+	payload := bytes.Repeat([]byte("ackoctl-binary-"), 8192) // 120 KiB
+	if err := os.WriteFile(src, payload, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dst, []byte("old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyReplace(src, dst); err != nil {
+		t.Fatalf("copyReplace: %v", err)
+	}
+
+	got, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("dst content mismatch: got %d bytes, want %d", len(got), len(payload))
+	}
+
+	info, err := os.Stat(dst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o755 {
+		t.Errorf("dst mode = %o, want 0755", perm)
+	}
+
+	// No leftover .ackoctl-* temp file in the destination directory.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".ackoctl-") {
+			t.Errorf("temp file left behind: %s", e.Name())
+		}
+	}
+}
+
 // TestDownloadFileWritesFullBytes covers the fsync/close path added so a
 // later checksum step or extract step never re-reads a truncated download.
 // We assert the on-disk byte count matches what the server sent — a missing

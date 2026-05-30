@@ -88,7 +88,15 @@ func Replace(newBinary, dst string) error {
 	}
 	// Rename failed (EXDEV, EACCES on the dest, etc). Fall through to a
 	// copy-then-rename within the destination directory.
+	return copyReplace(newBinary, dst)
+}
 
+// copyReplace implements the cross-device fallback for Replace: copy
+// newBinary into a temp file in dst's directory, fsync it, then atomically
+// rename it over dst. Split out from Replace so the copy path (which the
+// same-fs rename normally short-circuits) is directly exercisable in tests
+// without needing two real filesystems.
+func copyReplace(newBinary, dst string) error {
 	src, err := os.Open(newBinary)
 	if err != nil {
 		return fmt.Errorf("open extracted binary: %w", err)
@@ -104,6 +112,17 @@ func Replace(newBinary, dst string) error {
 		tmp.Close()
 		os.Remove(tmpName)
 		return fmt.Errorf("copy binary: %w", err)
+	}
+	// Flush the copied bytes to stable storage before the rename. Without
+	// this, a power loss between rename and the next invocation can leave a
+	// truncated ackoctl in place — and unlike a truncated download (which the
+	// next run simply re-fetches), a truncated *installed* binary breaks the
+	// CLI entirely. The download path already fsyncs for the same reason; this
+	// keeps the copy fallback (hit on EXDEV: kind, tmpfs overlays) consistent.
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("sync temp file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)

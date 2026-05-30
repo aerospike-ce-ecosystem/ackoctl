@@ -77,4 +77,5 @@ func TestTruncateSetRejectsEmptyNamespaceOrSet(t *testing.T) {
 	})
 	require.Error(t, c.TruncateSet(context.Background(), "conn-1", "", "users", nil))
 	require.Error(t, c.TruncateSet(context.Background(), "conn-1", "test", "", nil))
+	require.Error(t, c.TruncateSet(context.Background(), "", "test", "users", nil))
 }

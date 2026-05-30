@@ -123,6 +123,74 @@ func TestValidateBinsJSONObjectRejectsMalformed(t *testing.T) {
 	assert.Contains(t, err.Error(), "JSON object")
 }
 
+func TestValidateJSONObjectFlagAccepted(t *testing.T) {
+	for _, v := range []string{
+		`{"a":1}`,
+		`{}`, // shape check only; emptiness is enforced by validateBinsJSONObject
+		`  {"a":"b","c":[1,2]}  `,
+		"\n{\"x\":true}\n",
+	} {
+		require.NoError(t, validateJSONObjectFlag(v, "--filter"), "value %q should be accepted", v)
+	}
+}
+
+func TestValidateJSONObjectFlagRejectsMalformedBrace(t *testing.T) {
+	// Regression: these all start with '{' but are not valid JSON. A previous
+	// "first byte only" check accepted them because it never parsed the body,
+	// letting malformed input round-trip to the server as an opaque 422.
+	for _, v := range []string{
+		`{"a":}`,
+		`{bad`,
+		`{"a":1`,
+		`{,}`,
+		`{"a":1,}`,
+	} {
+		err := validateJSONObjectFlag(v, "--filter")
+		require.Error(t, err, "malformed value %q should be rejected", v)
+		assert.Contains(t, err.Error(), "--filter must be a JSON object")
+	}
+}
+
+func TestValidateJSONObjectFlagRejectsNonObject(t *testing.T) {
+	cases := []struct {
+		in   string
+		kind string
+	}{
+		{`[1,2,3]`, "array"},
+		{`"hi"`, "string"},
+		{`7`, "number"},
+		{`null`, "null"},
+		{`false`, "bool"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			err := validateJSONObjectFlag(tc.in, "--predicate")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--predicate must be a JSON object")
+			assert.Contains(t, err.Error(), tc.kind)
+		})
+	}
+}
+
+func TestValidateJSONObjectFlagRejectsEmpty(t *testing.T) {
+	for _, v := range []string{"", " ", "\t\n  "} {
+		err := validateJSONObjectFlag(v, "--filter")
+		require.Error(t, err, "value %q should be rejected", v)
+		assert.Contains(t, err.Error(), "non-empty JSON object")
+	}
+}
+
+func TestValidateBinsJSONObjectRejectsMalformedBrace(t *testing.T) {
+	// The --bins wrapper delegates the shape check to validateJSONObjectFlag,
+	// so brace-prefixed malformed JSON must now be caught at the validator
+	// layer rather than relying on a later json.Unmarshal in the call site.
+	for _, v := range []string{`{"a":}`, `{bad`, `{"a":1`} {
+		err := validateBinsJSONObject(v)
+		require.Error(t, err, "malformed bins %q should be rejected", v)
+		assert.Contains(t, err.Error(), "--bins must be a JSON object")
+	}
+}
+
 func TestValidatePKMatchModeAccepted(t *testing.T) {
 	for _, v := range []string{"", "exact", "prefix", "regex"} {
 		require.NoError(t, validatePKMatchMode(v), "pk-match-mode %q should be accepted", v)

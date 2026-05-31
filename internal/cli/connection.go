@@ -355,6 +355,14 @@ func parseLabels(pairs []string) (map[string]string, error) {
 		if k == "" {
 			return nil, fmt.Errorf("invalid label %q: key must not be empty", p)
 		}
+		// A repeated key would silently overwrite the earlier value
+		// (--label env=prod --label env=staging quietly drops env=prod). That
+		// is a foot-gun for a flag that ships a whole label set to the server,
+		// so reject the collision instead — mirroring the duplicate-key guard
+		// `cluster configure-namespace --param` already enforces.
+		if _, dup := out[k]; dup {
+			return nil, fmt.Errorf("label key %q specified more than once", k)
+		}
 		out[k] = v
 	}
 	return out, nil

@@ -348,6 +348,35 @@ func TestConnectionUpdateRejectsOutOfRangePort(t *testing.T) {
 	assert.Contains(t, err.Error(), "between 1 and 65535")
 }
 
+func TestConnectionCreateRejectsInvalidColor(t *testing.T) {
+	for _, color := range []string{"blue", "#FFF", "#GGGGGG", "1E88E5"} {
+		t.Run("color="+color, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server must not be called when --color is malformed")
+			}))
+			t.Cleanup(srv.Close)
+			_, _, err := runConnectionCmd(t, srv.URL, "",
+				"connection", "create",
+				"--name", "c", "--host", "h1", "--color", color,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "#RRGGBB")
+		})
+	}
+}
+
+func TestConnectionUpdateRejectsInvalidColor(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server must not be called when --color is malformed")
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runConnectionCmd(t, srv.URL, "",
+		"connection", "update", "c1", "--color", "notacolor",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "#RRGGBB")
+}
+
 // TestConnectionUpdateRejectsBothPasswordModes verifies that supplying both
 // --password and --password-stdin at once is rejected by Cobra's mutual
 // exclusion check BEFORE any HTTP call is issued — without it a user could

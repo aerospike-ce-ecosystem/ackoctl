@@ -205,6 +205,34 @@ func TestValidatePKMatchModeRejectsUnknown(t *testing.T) {
 	}
 }
 
+func TestValidateColorAccepted(t *testing.T) {
+	// Empty means "not supplied" and a well-formed #RRGGBB triplet (either
+	// case) are the only accepted shapes.
+	for _, v := range []string{"", "#1E88E5", "#abcdef", "#ABCDEF", "#000000", "#ffffff"} {
+		require.NoError(t, validateColor(v), "color %q should be accepted", v)
+	}
+}
+
+func TestValidateColorRejectsMalformed(t *testing.T) {
+	cases := []string{
+		"blue",       // bareword, no leading '#'
+		"1E88E5",     // missing leading '#'
+		"#FFF",       // 3-digit shorthand the UI does not render
+		"#1E88E50",   // too long
+		"#GGGGGG",    // non-hex digits
+		"#12345g",    // trailing non-hex digit
+		"#",          // just the hash
+		"  #1E88E5 ", // surrounding whitespace is not trimmed for a hex value
+	}
+	for _, v := range cases {
+		t.Run(v, func(t *testing.T) {
+			err := validateColor(v)
+			require.Error(t, err, "color %q should be rejected", v)
+			assert.Contains(t, err.Error(), "#RRGGBB")
+		})
+	}
+}
+
 func TestCleanStringSlice(t *testing.T) {
 	cases := []struct {
 		name string

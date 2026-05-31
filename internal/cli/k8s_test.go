@@ -329,3 +329,36 @@ func TestK8sCommandRejectsExtraPathSegment(t *testing.T) {
 	assert.Contains(t, err.Error(), "expected NAMESPACE/NAME")
 	assert.False(t, hit, "a malformed NAMESPACE/NAME must fail before any network call")
 }
+
+// The CE node-count cap (1..8) is enforced client-side before any network
+// call, so an out-of-range --size must fail fast with a clear message and never
+// reach the server. This guards the validation at newK8sClusterScaleCmd against
+// a regression that would otherwise only surface as a server-side webhook
+// rejection (or, worse, a silently-truncated scale).
+func TestK8sClusterScaleRejectsOutOfRangeSize(t *testing.T) {
+	for _, size := range []string{"0", "-1", "9", "100"} {
+		t.Run("size="+size, func(t *testing.T) {
+			serverHit := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				serverHit = true
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"namespace":"ns","name":"c1","phase":"Completed","size":3}`))
+			}))
+			t.Cleanup(srv.Close)
+
+			root := NewRootCmd()
+			root.SetOut(&bytes.Buffer{})
+			root.SetErr(&bytes.Buffer{})
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("ACKOCTL_SERVER", srv.URL)
+			t.Setenv("ACKOCTL_TOKEN", "test-token")
+			root.SetArgs([]string{"k8s", "cluster", "scale", "ns/c1", "--size", size})
+			root.SetContext(context.Background())
+
+			err := root.Execute()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "must be between 1 and 8")
+			assert.False(t, serverHit, "out-of-range --size must be rejected before any network call")
+		})
+	}
+}

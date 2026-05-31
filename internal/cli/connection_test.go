@@ -60,6 +60,14 @@ func TestParseLabelsRejectsEmptyKey(t *testing.T) {
 	assert.Contains(t, err.Error(), "key must not be empty")
 }
 
+func TestParseLabelsRejectsDuplicateKey(t *testing.T) {
+	// A repeated key would silently overwrite the earlier value; reject it so
+	// the user is told their input is ambiguous instead of losing env=prod.
+	_, err := parseLabels([]string{"env=prod", "env=staging"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "specified more than once")
+}
+
 func TestParseLabelsNilPassthrough(t *testing.T) {
 	got, err := parseLabels(nil)
 	require.NoError(t, err)

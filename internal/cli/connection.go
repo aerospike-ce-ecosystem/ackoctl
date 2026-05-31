@@ -106,6 +106,9 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePort(port); err != nil {
 				return err
 			}
+			if err := validateColor(color); err != nil {
+				return err
+			}
 			cleanHosts, err := sanitizeHosts(hosts)
 			if err != nil {
 				return err
@@ -229,6 +232,9 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 				req.Password = &pw
 			}
 			if cmd.Flags().Changed("color") {
+				if err := validateColor(color); err != nil {
+					return err
+				}
 				req.Color = &color
 			}
 			if cmd.Flags().Changed("note") {
@@ -266,7 +272,7 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&username, "user", "", "new username")
 	cmd.Flags().StringVar(&password, "password", "", "new password in plaintext — visible in shell history; prefer --password-stdin")
 	cmd.Flags().BoolVar(&passwordStdin, "password-stdin", false, "read new password from stdin (mutually exclusive with --password)")
-	cmd.Flags().StringVar(&color, "color", "", "new accent color")
+	cmd.Flags().StringVar(&color, "color", "", "new UI accent color in #RRGGBB")
 	cmd.Flags().StringVar(&note, "note", "", "new note")
 	cmd.Flags().StringSliceVar(&labels, "label", nil, "replace labels — key=value (repeatable)")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "move to a new workspace")

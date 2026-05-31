@@ -154,6 +154,33 @@ func cleanStringSlice(in []string) []string {
 	return out
 }
 
+// validateColor rejects a connection `--color` value that is not a 7-character
+// "#RRGGBB" hex triplet (the shape the flag help and the cluster-manager UI
+// document). An empty string means "not supplied" and is allowed — both create
+// (omitempty) and update (only sent when --color changed) treat it as optional.
+//
+// Without this check a typo such as `--color blue`, `--color #FFF` (3-digit
+// shorthand the UI does not render), or a stray `--color "#GGGGGG"` round-trips
+// to the server: cluster-manager stores the string verbatim, so the bad value
+// silently surfaces later as a broken/transparent accent swatch in the web UI
+// rather than as an actionable error at the point the user typed it. Failing
+// fast client-side keeps the error next to its cause.
+func validateColor(color string) error {
+	if color == "" {
+		return nil
+	}
+	if len(color) != 7 || color[0] != '#' {
+		return fmt.Errorf("--color must be a #RRGGBB hex value (e.g. #1E88E5), got %q", color)
+	}
+	for _, r := range color[1:] {
+		isHex := (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+		if !isHex {
+			return fmt.Errorf("--color must be a #RRGGBB hex value (e.g. #1E88E5), got %q", color)
+		}
+	}
+	return nil
+}
+
 // validatePKMatchMode rejects a `record query --pk-match-mode` value that is
 // not one of the modes cluster-manager accepts. An empty string means "not
 // supplied" and is allowed — the server defaults it to "exact". Without this

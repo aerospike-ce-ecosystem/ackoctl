@@ -206,6 +206,58 @@ func TestQueryExecBetweenRoundTrip(t *testing.T) {
 	assert.Equal(t, float64(20), pred["value2"])
 }
 
+func TestQueryExecBetweenRejectsInvertedNumericBounds(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("server should not be hit when --op between bounds are inverted")
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "between", "--value", "20", "--value2", "10",
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "must be <= --value2")
+}
+
+func TestQueryExecBetweenAllowsEqualNumericBounds(t *testing.T) {
+	var pred map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		pred, _ = body["predicate"].(map[string]any)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"records":[],"executionTimeMs":1,"scannedRecords":0,"returnedRecords":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	// lo == hi is a valid single-point inclusive range and must reach the server.
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "age", "--op", "between", "--value", "10", "--value2", "10",
+	)
+	require.NoError(t, err)
+	require.NotNil(t, pred)
+	assert.Equal(t, float64(10), pred["value"])
+	assert.Equal(t, float64(10), pred["value2"])
+}
+
+func TestQueryExecBetweenAllowsStringBounds(t *testing.T) {
+	var hit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hit = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"records":[],"executionTimeMs":1,"scannedRecords":0,"returnedRecords":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	// String operands are not numerically comparable here; the order guard must
+	// not fire, leaving the server as the authority on string range semantics.
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "name", "--op", "between", "--value", `"zeta"`, "--value2", `"alpha"`,
+	)
+	require.NoError(t, err)
+	assert.True(t, hit, "string bounds must be forwarded to the server, not rejected client-side")
+}
+
 func TestQueryExecRejectsUnknownPKType(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("server must not be called when --pk-type is invalid")

@@ -92,6 +92,73 @@ func TestSetContextRequiresServerOnCreate(t *testing.T) {
 	assert.Contains(t, err.Error(), "--server")
 }
 
+func TestSetContextRejectsMalformedServer(t *testing.T) {
+	cases := []struct {
+		name   string
+		server string
+	}{
+		{"missing scheme", "localhost:8000"},
+		{"non-http scheme", "ftp://host"},
+		{"path only", "/api/v1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+			_, _, err := runRoot(t, cfgPath, "config", "set-context", "ctx",
+				"--server", tc.server,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "--server must be an http(s) URL")
+			// A rejected --server must not persist a broken context to disk.
+			assert.NoFileExists(t, cfgPath, "config must not be written when --server is invalid")
+		})
+	}
+}
+
+func TestSetContextAcceptsValidServer(t *testing.T) {
+	for _, server := range []string{
+		"http://localhost:8000/api",
+		"https://acm.example.com/api",
+	} {
+		t.Run(server, func(t *testing.T) {
+			cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+			out, _, err := runRoot(t, cfgPath, "config", "set-context", "ctx",
+				"--server", server,
+			)
+			require.NoError(t, err)
+			assert.Contains(t, out, "saved")
+		})
+	}
+}
+
+func TestValidateServerURL(t *testing.T) {
+	cases := []struct {
+		name    string
+		server  string
+		wantErr bool
+	}{
+		{"http with host and path", "http://localhost:8000/api", false},
+		{"https with host and path", "https://acm.example.com/api", false},
+		{"http host no path", "http://localhost:8000", false},
+		{"missing scheme", "localhost:8000", true},
+		{"path only", "/api/v1", true},
+		{"non-http scheme", "ftp://host", true},
+		{"empty", "", true},
+		{"scheme but no host", "http://", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateServerURL(tc.server)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "--server must be an http(s) URL")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestVersionCommand(t *testing.T) {
 	out, _, err := runRoot(t, filepath.Join(t.TempDir(), "x.yaml"), "version", "--short")
 	require.NoError(t, err)

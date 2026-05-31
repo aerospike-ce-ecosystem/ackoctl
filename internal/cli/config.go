@@ -2,12 +2,29 @@ package cli
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/spf13/cobra"
 
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/config"
 	"github.com/aerospike-ce-ecosystem/ackoctl/internal/output"
 )
+
+// validateServerURL rejects --server values that are not well-formed http(s)
+// URLs with a host. Catching the mistake here (at write time) avoids persisting
+// a broken context that fails on every later command with an "invalid base url"
+// error far from the actual typo. This mirrors the scheme/host check in
+// BaseClient.url, which is kept as defense-in-depth.
+func validateServerURL(server string) error {
+	u, err := url.Parse(server)
+	if err != nil {
+		return fmt.Errorf("--server must be an http(s) URL with a host, e.g. http://localhost:8000/api; got %q: %w", server, err)
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return fmt.Errorf("--server must be an http(s) URL with a host, e.g. http://localhost:8000/api; got %q", server)
+	}
+	return nil
+}
 
 func newConfigCmd(global *GlobalFlags) *cobra.Command {
 	cmd := &cobra.Command{
@@ -125,6 +142,9 @@ func newConfigSetContextCmd(global *GlobalFlags) *cobra.Command {
 				merged.Name = name
 			}
 			if cmd.Flags().Changed("server") {
+				if err := validateServerURL(server); err != nil {
+					return err
+				}
 				merged.Server = server
 			}
 			if cmd.Flags().Changed("token") {

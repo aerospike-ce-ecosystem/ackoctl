@@ -97,5 +97,34 @@ go through cluster-manager's /api/* surface.`,
 		newAdminCmd(flags),
 		newInfoCmd(flags),
 	)
+
+	// cobra generates the `completion` command lazily on Execute. Initialize it
+	// eagerly so we can augment the zsh help: cobra's default only documents the
+	// fpath/site-functions persistent setup, which trips up users who just want
+	// to source completions from their ~/.zshrc.
+	cmd.InitDefaultCompletionCmd()
+	augmentZshCompletionHelp(cmd)
+
 	return cmd
+}
+
+// augmentZshCompletionHelp appends the simpler "source from ~/.zshrc" persistent
+// setup to `completion zsh`'s help. cobra's stock zsh help only covers the
+// fpath/site-functions approach, so users who don't manage fpath have no
+// documented one-liner for loading completions in every new session.
+func augmentZshCompletionHelp(root *cobra.Command) {
+	comp, _, err := root.Find([]string{"completion"})
+	if err != nil || comp == nil {
+		return
+	}
+	for _, sub := range comp.Commands() {
+		if sub.Name() != "zsh" {
+			continue
+		}
+		sub.Long += "\n" + `Alternatively, to load completions for every new session without managing
+fpath, add this line to your ~/.zshrc (after the compinit line above):
+
+	source <(ackoctl completion zsh)
+`
+	}
 }

@@ -1,0 +1,104 @@
+name: Daily Release
+# Runs daily at KST 07:00 (UTC 22:00 previous day). Auto-tags a new release when
+# there are commits since the last tag, then lets release.yml do the rest.
+#
+# Version bump follows Conventional Commits: feat → minor, everything else → patch.
+# MAJOR bumps stay manual — a maintainer tags vX.0.0 themselves (workspace policy).
+#
+# Why this repo differs from the other ecosystem daily-release workflows:
+# aerospike-py / ACKO / cluster-manager create the GitHub release directly with
+# `gh release create`. ackoctl already owns a goreleaser-on-tag-push pipeline
+# (release.yml) that builds the binaries, writes the release notes via its own
+# `changelog.use: github`, and bumps the Homebrew formula. To avoid double
+# release creation (and the keep-existing/replace conflict that would cause),
+# this workflow only computes and pushes the tag; goreleaser owns the release.
+#
+# The tag MUST be pushed with GH_AW_GITHUB_TOKEN (a PAT). A tag pushed with the
+# default GITHUB_TOKEN would NOT fire release.yml's `on: push: tags` trigger
+# (GitHub suppresses workflow-token pushes to prevent recursion).
+
+on:
+  schedule:
+    - cron: "0 22 * * *" # UTC 22:00 = KST 07:00
+  workflow_dispatch: # manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          # PAT so the tag push below triggers release.yml (see header note).
+          token: ${{ secrets.GH_AW_GITHUB_TOKEN }}
+
+      - name: Check for changes since last release
+        id: changes
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous release found. Checking all commits."
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+          else
+            COMMIT_COUNT=$(git rev-list --count "${LATEST_TAG}..HEAD")
+          fi
+          echo "latest_tag=${LATEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "commit_count=${COMMIT_COUNT}" >> "$GITHUB_OUTPUT"
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No changes since ${LATEST_TAG}. Skipping release."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "${COMMIT_COUNT} commits since ${LATEST_TAG}."
+          fi
+
+      - name: Determine next version
+        if: steps.changes.outputs.skip == 'false'
+        id: version
+        run: |
+          LATEST_TAG="${{ steps.changes.outputs.latest_tag }}"
+          if [ -z "$LATEST_TAG" ]; then
+            echo "next_version=v0.0.1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Strip 'v' prefix for parsing
+          VERSION="${LATEST_TAG#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # daily-release auto-bumps minor (feat) or patch only.
+          # Major bump is manual: a maintainer tags the new major version themselves.
+          # `feat!:` / `BREAKING CHANGE` markers surface in release notes, not in version.
+          COMMITS=$(git log "${LATEST_TAG}..HEAD" --pretty=format:"%s")
+          HAS_FEAT=$(echo "$COMMITS" | grep -cE '^feat(\(.+\))?!?:' || true)
+
+          if [ "$HAS_FEAT" -gt 0 ]; then
+            MINOR=$((MINOR + 1))
+            PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "next_version=${NEXT}" >> "$GITHUB_OUTPUT"
+          echo "Bumping ${LATEST_TAG} → ${NEXT}"
+
+      - name: Create and push tag
+        if: steps.changes.outputs.skip == 'false'
+        env:
+          NEXT_VERSION: ${{ steps.version.outputs.next_version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "${NEXT_VERSION}" >/dev/null 2>&1; then
+            echo "Tag ${NEXT_VERSION} already exists. Skipping."
+            exit 0
+          fi
+          git tag -a "${NEXT_VERSION}" -m "release: ${NEXT_VERSION}"
+          git push origin "${NEXT_VERSION}"
+          echo "Pushed ${NEXT_VERSION}; release.yml (goreleaser) will build and publish."

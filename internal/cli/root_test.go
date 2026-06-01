@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,4 +63,24 @@ func TestValidOutputFormatPassesPreRunValidation(t *testing.T) {
 
 	require.NoError(t, root.Execute())
 	assert.True(t, hit, "a valid -o value must not block the command")
+}
+
+// The zsh completion help must document the simple ~/.zshrc sourcing method,
+// not only cobra's default fpath/site-functions approach.
+func TestZshCompletionHelpDocumentsZshrcSourcing(t *testing.T) {
+	root := NewRootCmd()
+	comp, _, err := root.Find([]string{"completion"})
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+
+	var zsh *cobra.Command
+	for _, sub := range comp.Commands() {
+		if sub.Name() == "zsh" {
+			zsh = sub
+			break
+		}
+	}
+	require.NotNil(t, zsh, "completion zsh subcommand must exist")
+	assert.Contains(t, zsh.Long, "~/.zshrc")
+	assert.Contains(t, zsh.Long, "source <(ackoctl completion zsh)")
 }

@@ -1,6 +1,6 @@
 # In-cluster E2E — kind + ACKO + cluster-manager
 
-Manual scenario that proves the upstream `install.sh` one-liner produces a working `ackoctl` binary that can drive ACKO **from inside the same Kubernetes cluster** — the realistic path for CI runners, jump pods, and operations workflows.
+This manual scenario verifies that the upstream `install.sh` script produces a working `ackoctl` binary. It runs `ackoctl` **inside the same Kubernetes cluster** as ACKO, which matches common CI runner, jump pod, and operations workflows.
 
 ## What this verifies
 
@@ -56,10 +56,7 @@ AerospikeCluster CR
 
 ## Test pod
 
-The script below runs inside the cluster. It installs `ackoctl` via the
-upstream installer, points it at the in-cluster service over its DNS name,
-and asks cluster-manager for the list of `AerospikeCluster` CRs ACKO is
-reconciling.
+The script runs inside the cluster. It installs `ackoctl` with the upstream installer and connects to the in-cluster service through its DNS name. It then asks Cluster Manager for the `AerospikeCluster` CRs that ACKO is reconciling.
 
 `pod-install-sh-test.sh`:
 ```bash
@@ -94,9 +91,7 @@ NAMESPACE  NAME         PHASE      NODES
 aerospike  testcluster  Completed  1
 ```
 
-To exercise the alpine path, swap the image to `alpine:3` and replace the
-apt prelude with `apk add --no-cache curl bash ca-certificates` — `install.sh`
-is POSIX-shell only and runs unmodified.
+To test Alpine, change the image to `alpine:3` and replace the apt commands with `apk add --no-cache curl bash ca-certificates`. The POSIX `install.sh` script runs without other changes.
 
 ## Cleanup
 
@@ -107,8 +102,8 @@ kubectl delete configmap ackoctl-install-test --ignore-not-found
 
 ## Notes
 
-- The in-cluster DNS name above (`acko-aerospike-ce-kubernetes-operator-ui-api.aerospike-operator.svc.cluster.local`) is the default for a release named `acko` in namespace `aerospike-operator`. If your release/namespace differs, run `kubectl get svc -A | grep ui-api` to find the actual name.
-- `ackoctl config set-context` only configures the client; no in-cluster RBAC binding is needed because cluster-manager itself owns the Kubernetes API access. Auth (`--token` / `ACKOCTL_TOKEN`) is the cluster-manager bearer, not a K8s ServiceAccount token.
+- The in-cluster DNS name above (`acko-aerospike-ce-kubernetes-operator-ui-api.aerospike-operator.svc.cluster.local`) assumes a release named `acko` in the `aerospike-operator` namespace. For another release or namespace, run `kubectl get svc -A | grep ui-api` to find the service name.
+- `ackoctl config set-context` configures only the client. You do not need an in-cluster RBAC binding because Cluster Manager owns Kubernetes API access. Authentication through `--token` or `ACKOCTL_TOKEN` uses the Cluster Manager bearer token, not a K8s ServiceAccount token.
 - For namespaced commands you may need `--namespace`/`-N` rather than `-n` depending on the verb — see `ackoctl k8s cluster <verb> --help`.
-- The pod above does not need internet egress for `apt update` itself, only for `raw.githubusercontent.com` (install.sh) and `github.com` (release tarball). In air-gapped clusters mirror those two URLs into your internal registry/proxy.
+- The pod needs internet egress for `raw.githubusercontent.com` (`install.sh`) and `github.com` (the release archive). For air-gapped clusters, mirror both URLs through an internal registry or proxy.
 - Tested with: ACKO chart 1.3.1, K8s 1.35 (kind), ackoctl v0.2.0, arm64 host.

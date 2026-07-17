@@ -11,15 +11,15 @@
   <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-647283?logo=apache&amp;logoColor=FFC72C&amp;labelColor=0B1F33"></a>
 </p>
 
-`ackoctl` is a command-line interface for [aerospike-cluster-manager](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager), the management UI for Aerospike Community Edition clusters running on Kubernetes via [ACKO](https://github.com/aerospike-ce-ecosystem/aerospike-ce-kubernetes-operator).
+`ackoctl` is a command-line client for [aerospike-cluster-manager](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager). Cluster Manager manages Aerospike Community Edition clusters that run on Kubernetes through [ACKO](https://github.com/aerospike-ce-ecosystem/aerospike-ce-kubernetes-operator).
 
-It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aerospike connections, browse records, run queries, and trigger ACKO reconciliations from your terminal or CI pipeline — without leaving the shell.
+The CLI calls Cluster Manager's REST API (`/api/v1/*`). Use it from a terminal or CI pipeline to manage connections, browse records, run queries, and trigger ACKO reconciliations.
 
 ## Status
 
-**v0.2.0** — feature-complete for control-plane operations (connections, cluster info, K8s), data-plane reads/writes (records, sets, queries, secondary indexes), admin/UDF commands, operator notes, and self-upgrade.
+**v0.2.0** covers control-plane operations (connections, cluster information, and K8s), data-plane reads and writes (records, sets, queries, and secondary indexes), admin and UDF commands, operator notes, and self-upgrade.
 
-See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.md](docs/install.md) for build and install options, and [docs/e2e-kind.md](docs/e2e-kind.md) for an in-cluster (kind + ACKO + cluster-manager) end-to-end test scenario.
+See [docs/usage.md](docs/usage.md) for command examples and [docs/install.md](docs/install.md) for installation options. The [in-cluster test guide](docs/e2e-kind.md) walks through a kind + ACKO + Cluster Manager scenario.
 
 ## Install
 
@@ -29,7 +29,7 @@ See [docs/usage.md](docs/usage.md) for a per-command cheat sheet, [docs/install.
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
 ```
 
-Detects OS/arch automatically (darwin/linux × amd64/arm64), verifies the sha256 checksum, and installs to `/usr/local/bin/ackoctl`. See [docs/install.md](docs/install.md) for pinning a version, custom `BIN_DIR`, manual install, and source build.
+The installer detects the OS and architecture (darwin/linux × amd64/arm64), verifies the SHA-256 checksum, and installs `ackoctl` in `/usr/local/bin`. See [docs/install.md](docs/install.md) to pin a version, choose `BIN_DIR`, install manually, or build from source.
 
 ### Homebrew (macOS)
 
@@ -39,14 +39,14 @@ brew install aerospike-ce-ecosystem/tap/ackoctl
 
 ### Upgrade
 
-Once `ackoctl` is on `$PATH` it can upgrade itself:
+After `ackoctl` is on `$PATH`, it can upgrade itself:
 
 ```bash
 ackoctl upgrade           # pull the latest release
 ackoctl upgrade --check   # report current vs latest, do not install
 ```
 
-Every command also runs a once-a-day check against the GitHub Releases page and prints a one-line warning when a newer tag is available. Disable with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
+Once a day, commands check GitHub Releases and print a one-line warning when a newer tag is available. Disable this check with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
 
 ## Quick start
 
@@ -73,7 +73,7 @@ Override priority: CLI flag > environment variable > config file.
 | `ACKOCTL_CONTEXT` | `--context` |
 | `ACKOCTL_INSECURE_SKIP_TLS` | `--insecure-skip-tls` |
 
-OIDC tokens must be obtained out-of-band (e.g. via Keycloak CLI or browser device flow) and passed via `--token` or `ACKOCTL_TOKEN`.
+Obtain OIDC tokens outside `ackoctl`, for example with the Keycloak CLI or a browser device flow. Pass the token with `--token` or `ACKOCTL_TOKEN`.
 
 ## Commands
 
@@ -113,7 +113,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Tagging triggers `release.yml` → goreleaser builds per-OS/arch `.tar.gz` archives and `checksums.txt`, uploads them to the GitHub Release alongside `install.sh`, and (with `GH_AW_GITHUB_TOKEN` set) bumps the formula in `aerospike-ce-ecosystem/homebrew-tap`.
+Pushing the tag starts `release.yml`. GoReleaser builds `.tar.gz` archives for each supported OS and architecture, generates `checksums.txt`, and uploads those files and `install.sh` to the GitHub Release. When `GH_AW_GITHUB_TOKEN` is set, the workflow also updates the formula in `aerospike-ce-ecosystem/homebrew-tap`.
 
 Required repository secrets:
 

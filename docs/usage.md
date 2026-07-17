@@ -1,6 +1,6 @@
 # ackoctl usage
 
-`ackoctl` is a kubectl/gh-style CLI for [aerospike-cluster-manager](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager). All commands hit cluster-manager's REST API at `/api/v1/*`.
+`ackoctl` follows the command style of kubectl and gh. It sends every command to [aerospike-cluster-manager](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager) through the `/api/v1/*` REST API.
 
 ## Global flags
 
@@ -80,7 +80,7 @@ ackoctl cluster configure-namespace <CONN_ID> \
 
 ## k8s — ACKO-managed Kubernetes clusters
 
-Requires cluster-manager to have `K8S_MANAGEMENT_ENABLED=true`. Otherwise the server returns 404.
+Set `K8S_MANAGEMENT_ENABLED=true` in Cluster Manager before you use these commands. Otherwise, the server returns 404.
 
 ```bash
 ackoctl k8s cluster list                                 # all AerospikeCluster CRs
@@ -112,11 +112,11 @@ ackoctl record query <CONN_ID> \
   --select=name,age --page-size=50
 ```
 
-`--bins` takes the **entire bin set as a single JSON object** — not repeatable key/value pairs. `--bins='{"name":"Alice","age":30}'` is correct; `--bins=name=Alice --bins=age=30` returns `--bins must be a JSON object`. JSON typing is preserved end-to-end, so numbers stay numbers and quoted strings stay strings.
+`--bins` accepts the **complete bin set as one JSON object**, not repeated key/value pairs. Use `--bins='{"name":"Alice","age":30}'`. The form `--bins=name=Alice --bins=age=30` returns `--bins must be a JSON object`. JSON types remain intact, so numbers stay numbers and quoted strings stay strings.
 
-`--filter` and `--predicate` accept raw JSON to pass through cluster-manager's `FilterGroup` / `QueryPredicate` DSL when you need the full power.
+Use `--filter` and `--predicate` to pass raw JSON to Cluster Manager's `FilterGroup` / `QueryPredicate` DSL.
 
-`--pk-type` lets you pin the particle type (`auto|string|int|bytes`). With `auto` cluster-manager will retry the alternate type on `NOT_FOUND`.
+Use `--pk-type` to set the particle type (`auto|string|int|bytes`). With `auto`, Cluster Manager retries the alternate type after `NOT_FOUND`.
 
 ---
 
@@ -127,7 +127,7 @@ ackoctl set list <CONN_ID>                       # all namespaces
 ackoctl set list <CONN_ID> --namespace=test      # one namespace
 ```
 
-There's no dedicated `/sets` endpoint on the server; ackoctl pulls the cluster info response and extracts `namespaces[].sets[]`.
+The server has no dedicated `/sets` endpoint. `ackoctl` reads the cluster information response and extracts `namespaces[].sets[]`.
 
 ---
 
@@ -177,7 +177,7 @@ ackoctl info <CONN_ID> --command=statistics --node=BB9020011AC4202
 ackoctl info <CONN_ID> --allow-write --command='set-config:context=service;proto-fd-max=20000'
 ```
 
-cluster-manager enforces a read-only whitelist by default (`build`, `status`, `statistics`, `namespaces`, `namespace/<ns>`, ...). `--allow-write` bypasses the whitelist so verbs such as `set-config:` go through. One row per `(node, command)` pair is returned.
+By default, Cluster Manager allows only read-only commands such as `build`, `status`, `statistics`, `namespaces`, and `namespace/<ns>`. `--allow-write` bypasses this list and permits commands such as `set-config:`. The response contains one row for each `(node, command)` pair.
 
 ---
 
@@ -198,13 +198,13 @@ ackoctl admin role create <CONN_ID> --name=analyst --privilege=read:test --privi
 ackoctl admin role delete <CONN_ID> --name=analyst --yes
 ```
 
-Prefer `--password-stdin` over `--password` — the plaintext form ends up in shell history.
+Use `--password-stdin` instead of `--password` so the plaintext password does not remain in shell history.
 
 ---
 
 ## note — operator memos stored in cluster-manager
 
-Notes are free-text annotations stored in cluster-manager's metaDB (not in Aerospike itself). They are scoped per connection profile and cascade-delete with the connection. Use them for runbook context, ticket references, or known-issue markers.
+Notes are free-text annotations in Cluster Manager's metaDB, not in Aerospike. Each note belongs to a connection profile and is deleted with that connection. Use notes for runbook context, ticket references, or known issues.
 
 ```bash
 # Set-level notes
@@ -222,7 +222,7 @@ ackoctl note record delete <CONN_ID> --namespace=test --set=users --pk=alice --y
 
 ## guide — operational guides (org/team policy)
 
-Guides are workspace-scoped Markdown policy documents managed in cluster-manager. Each workspace has a **data-plane** guide (policy for Aerospike data CRUD) and a **control-plane** guide (policy for cluster lifecycle). Read the relevant guide **before** running data or cluster operations so your changes follow the org/team policy. This command is read-only — guides are authored by acko administrators in the cluster-manager web UI.
+Guides are workspace-scoped Markdown policy documents stored in Cluster Manager. Each workspace has a **data-plane** guide for Aerospike data CRUD and a **control-plane** guide for cluster lifecycle operations. Read the relevant guide **before** you change data or clusters. The command is read-only; acko administrators author guides in the Cluster Manager web UI.
 
 The workspace comes from `--workspace` or the current context; when neither is set it falls back to the built-in `ws-default` workspace.
 
@@ -234,7 +234,7 @@ ackoctl guide get data-plane --workspace=ws-team-a
 ackoctl guide get control-plane -o json         # structured: title, timestamps, author
 ```
 
-`guide get` prints the raw Markdown to stdout under the default output so it reads naturally and pipes cleanly; `-o json` / `-o yaml` emit the full structured guide.
+With the default output, `guide get` prints raw Markdown to stdout for easy reading and piping. Use `-o json` or `-o yaml` for the complete structured guide.
 
 ---
 
@@ -255,9 +255,9 @@ cluster-manager validates `--filename` against `^[a-zA-Z0-9_.-]{1,255}$`; invali
 
 ## Output formats
 
-`-o json` and `-o yaml` always honor the cluster-manager schema verbatim — feed them to `jq` / `yq` / scripts.
+`-o json` and `-o yaml` preserve the Cluster Manager schema. You can pass their output to `jq`, `yq`, or scripts.
 
-`-o table` is the default and is best-effort:
+`-o table` is the default and uses a best-effort layout:
 
 - list commands have hand-tuned columns,
 - single-resource commands (get, info, health) fall back to a key/value tree.

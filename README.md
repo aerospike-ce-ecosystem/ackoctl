@@ -4,6 +4,13 @@
   <img src="docs/images/logo.svg" alt="ackoctl" width="560" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/aerospike-ce-ecosystem/ackoctl"><img alt="GitHub repository" src="https://img.shields.io/badge/GitHub-ackoctl-0B1F33?logo=github&amp;logoColor=FFC72C"></a>
+  <a href="https://github.com/aerospike-ce-ecosystem/ackoctl/actions/workflows/ci.yml"><img alt="CI status" src="https://img.shields.io/github/actions/workflow/status/aerospike-ce-ecosystem/ackoctl/ci.yml?branch=main&amp;logo=githubactions&amp;logoColor=FFC72C&amp;label=CI&amp;labelColor=0B1F33"></a>
+  <a href="https://github.com/aerospike-ce-ecosystem/ackoctl/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/aerospike-ce-ecosystem/ackoctl?logo=github&amp;logoColor=FFC72C&amp;label=release&amp;labelColor=0B1F33&amp;color=647283"></a>
+  <a href="LICENSE"><img alt="Apache 2.0 license" src="https://img.shields.io/badge/license-Apache%202.0-647283?logo=apache&amp;logoColor=FFC72C&amp;labelColor=0B1F33"></a>
+</p>
+
 `ackoctl` is a command-line interface for [aerospike-cluster-manager](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager), the management UI for Aerospike Community Edition clusters running on Kubernetes via [ACKO](https://github.com/aerospike-ce-ecosystem/aerospike-ce-kubernetes-operator).
 
 It talks to cluster-manager's REST API (`/api/v1/*`) so that you can manage Aerospike connections, browse records, run queries, and trigger ACKO reconciliations from your terminal or CI pipeline — without leaving the shell.

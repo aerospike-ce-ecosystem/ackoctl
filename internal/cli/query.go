@@ -86,6 +86,20 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 					if err != nil {
 						return fmt.Errorf("--value2: %w", err)
 					}
+					// An inverted numeric range (--value > --value2) is a silent
+					// footgun: Aerospike's between is an inclusive low..high range,
+					// so a swapped pair matches zero records and the server returns
+					// an empty result set with no error. The user then sees "no
+					// matches" and blames their data instead of the swapped bounds.
+					// Only enforce the order when BOTH operands parsed as JSON
+					// numbers (the only meaningful between case for a secondary
+					// index range); strings/lists/other types are left to the
+					// server, which is the authority on their comparison semantics.
+					if lo, loOK := v.(float64); loOK {
+						if hi, hiOK := v2.(float64); hiOK && lo > hi {
+							return fmt.Errorf("--value (%v) must be <= --value2 (%v) for --op between; the bounds appear swapped", v, v2)
+						}
+					}
 					pred.Value2 = v2
 				}
 				req.Predicate = pred

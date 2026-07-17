@@ -30,6 +30,7 @@ archives:
       - LICENSE
       - README.md
       - install.sh
+      - docs/images/*
 
 brews:
   - name: ackoctl

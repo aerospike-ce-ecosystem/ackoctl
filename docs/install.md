@@ -1,6 +1,6 @@
 # Installing ackoctl
 
-`ackoctl` ships as a single static binary. Two install channels are supported: the shell one-liner (Linux, macOS) and Homebrew (macOS). Both serve the same artifacts from the GitHub Releases page.
+`ackoctl` is a single static binary. Install it with the shell script on Linux or macOS, or with Homebrew on macOS. Both methods use artifacts from GitHub Releases.
 
 ## Shell one-liner (Linux, macOS)
 
@@ -8,7 +8,7 @@
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh | sh
 ```
 
-The script:
+The script does the following:
 
 - detects `darwin/linux` × `amd64/arm64` from `uname`,
 - resolves the latest GitHub release (or honours `ACKOCTL_VERSION`),
@@ -17,8 +17,7 @@ The script:
 
 ### Pin a version
 
-`ACKOCTL_VERSION` must be set on the `sh` process — not on `curl` — so the
-pipe target inherits it:
+Set `ACKOCTL_VERSION` on the `sh` process, not on `curl`, so the pipe target receives the value:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aerospike-ce-ecosystem/ackoctl/main/install.sh \
@@ -66,7 +65,7 @@ Homebrew handles updates: `brew upgrade ackoctl`. The formula lives in [aerospik
 
 ## Manual install
 
-If you'd rather skip the script, pick the archive that matches your machine from the [Releases page](https://github.com/aerospike-ce-ecosystem/ackoctl/releases) and untar it yourself:
+To install without the script, download the archive for your system from the [Releases page](https://github.com/aerospike-ce-ecosystem/ackoctl/releases) and extract it:
 
 ```bash
 VERSION=0.1.0
@@ -80,7 +79,7 @@ sudo install -m 0755 ackoctl /usr/local/bin/ackoctl
 ackoctl version
 ```
 
-The release also ships a `checksums.txt` — verify with `sha256sum -c` (Linux) or `shasum -a 256 -c` (macOS) before installing.
+Each release includes `checksums.txt`. Verify it with `sha256sum -c` on Linux or `shasum -a 256 -c` on macOS before you install the binary.
 
 ## From source
 
@@ -97,7 +96,7 @@ sudo mv ./bin/ackoctl /usr/local/bin/
 go install github.com/aerospike-ce-ecosystem/ackoctl/cmd/ackoctl@latest
 ```
 
-Installs to `$(go env GOBIN)` (typically `~/go/bin`).
+This command installs the binary in `$(go env GOBIN)`, typically `~/go/bin`.
 
 ## Verifying
 
@@ -114,7 +113,7 @@ ackoctl upgrade --check      # report current vs latest, do not install
 ackoctl upgrade --version v0.1.0   # pin to a specific release
 ```
 
-`ackoctl` also prints a one-line warning to stderr when a newer release is available (checked once every 24h, results cached in `~/.ackoctl/.version-check.json`). Disable with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
+When a newer release is available, `ackoctl` prints a one-line warning to stderr. It checks once every 24 hours and caches the result in `~/.ackoctl/.version-check.json`. Disable the check with `--no-version-check` or `ACKOCTL_NO_VERSION_CHECK=1`.
 
 Homebrew users should use `brew upgrade ackoctl` instead so the formula stays in sync with the installed binary.
 

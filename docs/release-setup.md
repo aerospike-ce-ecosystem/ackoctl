@@ -1,14 +1,14 @@
 # Release infrastructure setup
 
-The `release.yml` workflow is fully automated. The initial scaffolding (Homebrew tap, cross-repo PAT) is already in place — this document records the current state and the few operator-facing knobs that remain.
+The `release.yml` workflow automates the release process. The Homebrew tap and cross-repository PAT are already configured. This guide records the current setup and the settings that maintainers may need to change.
 
-Every `git push --tags` will:
+Every `git push --tags` does the following:
 
 1. Build per-OS/arch `.tar.gz` archives + `checksums.txt` via goreleaser
 2. Upload them (plus `install.sh`) to the GitHub Release page
 3. Bump the Homebrew formula in `aerospike-ce-ecosystem/homebrew-tap`
 
-…with no manual steps. Users install via the upstream one-liner (`curl … | sh`) or Homebrew — no package-manager repos (apt/yum) are hosted.
+The workflow needs no other manual steps. Users install with the upstream script (`curl … | sh`) or Homebrew. The project does not host apt or yum repositories.
 
 ---
 
@@ -23,7 +23,7 @@ Every `git push --tags` will:
 
 ## Reference: re-creating the scaffolding from scratch
 
-If you ever need to rebuild from zero, the steps below are the same ones the initial setup followed.
+If you need to rebuild the release infrastructure, follow the same steps used for the original setup.
 
 ## 1. Create the Homebrew tap repository
 
@@ -33,11 +33,11 @@ If you ever need to rebuild from zero, the steps below are the same ones the ini
 | Visibility | Public |
 | Initial content | a single `README.md` is enough |
 
-The repository name **must** start with `homebrew-` (Homebrew convention). The user-facing tap name (`aerospike-ce-ecosystem/tap`) drops that prefix automatically.
+The repository name **must** start with `homebrew-`, as required by Homebrew. Homebrew automatically removes that prefix from the user-facing tap name (`aerospike-ce-ecosystem/tap`).
 
 ## 2. Mint a PAT for cross-repo formula bumps
 
-The default `GITHUB_TOKEN` cannot push to a different repo. Mint a Personal Access Token:
+The default `GITHUB_TOKEN` cannot push to another repository. Create a Personal Access Token:
 
 - Fine-grained token recommended
   - Resource owner: `aerospike-ce-ecosystem`
@@ -53,7 +53,7 @@ Then in `aerospike-ce-ecosystem/ackoctl` → Settings → Secrets and variables 
 
 ## 3. Test with a snapshot tag
 
-Push a candidate tag and watch the workflow:
+Push a test tag and monitor the workflow:
 
 ```bash
 git tag v0.0.0-test
@@ -65,7 +65,7 @@ Expected:
 - `release` workflow: green; the GitHub Release for `v0.0.0-test` lists the per-OS/arch `.tar.gz` archives, `checksums.txt`, and `install.sh`.
 - `aerospike-ce-ecosystem/homebrew-tap` gets a `chore(formula): bump ackoctl to v0.0.0-test` commit on `main`.
 
-Sanity-check from a clean machine (or container):
+Verify the result from a clean machine or container:
 
 ```bash
 # Shell one-liner (Linux container)
@@ -80,7 +80,7 @@ brew install aerospike-ce-ecosystem/tap/ackoctl
 ackoctl version
 ```
 
-Then delete the test release + tag if you don't want it lingering:
+Delete the test release and tag when you no longer need them:
 
 ```bash
 gh release delete v0.0.0-test --yes
@@ -96,7 +96,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-Done. The workflow runs automatically and within ~3 minutes:
+The workflow starts automatically and usually finishes within about three minutes:
 
 - `brew upgrade ackoctl` picks up the new formula
 - existing installs see `warning: ackoctl ... is outdated` on next invocation

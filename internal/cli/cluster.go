@@ -69,7 +69,11 @@ and replicationFactor. Only the knobs you supply are sent; any other --param
 key is rejected, because the server would drop it silently and still answer
 200.
 
-Supplying just one of the two needs --yes. A cluster-manager without the fix in
+The change lands on a running namespace, so this command requires --yes/-y —
+whether you supply one knob or both.
+
+Supplying just one of the two carries an extra hazard. A cluster-manager
+without the fix in
 ` + clusterManagerOmittedParamFixURL + `
 substitutes its own default for the omitted knob (memorySize=1073741824,
 replicationFactor=2) and applies it to the running namespace, so a one-knob
@@ -84,23 +88,38 @@ For knobs outside those two, use the asinfo passthrough:
     --command 'set-config:context=namespace;id=<ns>;high-water-disk-pct=70'`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Build first so a mistyped --param is reported as a typo rather
+			// than as a missing confirmation. The at-least-one-param guard that
+			// used to sit here moved into the builder with the rest of the
+			// --param validation.
 			req, err := buildConfigureNamespaceRequest(nsName, params)
 			if err != nil {
 				return err
 			}
-			// A partial body is safe against a fixed server and unsafe against
-			// today's, so it is gated rather than refused: an operator who wants
-			// to change one knob must not be forced to restate the other, since
-			// restating a value they would have to guess is itself how a live
-			// namespace gets resized. --yes is the only affordance — ackoctl has
-			// no interactive prompt anywhere, by design, so CI cannot hang here.
-			// This whole block becomes unnecessary once the linked fix ships.
-			if omitted := omittedKnobs(req); len(omitted) != 0 {
-				if !yes {
-					return fmt.Errorf(
-						"confirmation required (--yes): %s. A cluster-manager without the fix in %s substitutes its own default and applies it to the running namespace %q. Supply the value explicitly, or pass --yes to accept whatever the server does with it",
+			// A set-config against a live namespace is as destructive as the
+			// eleven pre-existing sites that gate on --yes — a wrong value can
+			// push a namespace into eviction or stop-writes. The gate is keyed on
+			// impact, so it is unconditional: an explicit memorySize=1000000 is
+			// every bit as destructive as an omitted one, and gating only on
+			// omission would wave the explicit shrink straight through. --yes is
+			// the only affordance; ackoctl has no interactive prompt anywhere, by
+			// design, so this can never hang in CI.
+			if !yes {
+				detail := fmt.Sprintf("configure-namespace mutates a live namespace on %s", mutationTarget(global))
+				// When the body is partial, say which knob the server will fill
+				// in and with what: that is the difference between a refusal the
+				// operator can act on and one they can only work around.
+				if omitted := omittedKnobs(req); len(omitted) != 0 {
+					detail += fmt.Sprintf(". %s: a cluster-manager without the fix in %s substitutes its own default and applies it to namespace %q, so supply the value explicitly unless you intend that",
 						strings.Join(omitted, "; "), clusterManagerOmittedParamFixURL, nsName)
 				}
+				return fmt.Errorf("confirmation required (--yes): %s", detail)
+			}
+			// Confirmed, but still partial: name the knob the server may
+			// overwrite before the request goes out. Both the gate detail above
+			// and this warning become unnecessary once no reachable server
+			// predates the linked fix.
+			if omitted := omittedKnobs(req); len(omitted) != 0 {
 				fmt.Fprintf(cmd.ErrOrStderr(),
 					"ackoctl: WARNING — %s. A cluster-manager without the fix in %s will apply its own default to namespace %q on the running cluster\n",
 					strings.Join(omitted, "; "), clusterManagerOmittedParamFixURL, nsName)
@@ -127,8 +146,7 @@ For knobs outside those two, use the asinfo passthrough:
 	// fragments that produce a different error.
 	cmd.Flags().StringArrayVar(&params, "param", nil,
 		"config knob as key=value; only memorySize=<bytes> and replicationFactor=<1-8> are read by the server (repeatable)")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false,
-		"confirm sending only one of the two knobs (the server may apply its own default to the other)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm live-namespace config mutation")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }

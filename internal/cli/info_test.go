@@ -91,7 +91,7 @@ func TestInfoAllowWriteFlipsReadOnly(t *testing.T) {
 	_, _, err := runInfoCmd(t, srv.URL,
 		"info", "conn-1",
 		"--command", "set-config:context=service;proto-fd-max=20000",
-		"--allow-write",
+		"--allow-write", "--yes",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, false, body["readOnly"], "--allow-write must send readOnly=false")
@@ -173,4 +173,78 @@ func TestInfoTableOutputRendersHeaders(t *testing.T) {
 	assert.Contains(t, out, "ERROR")
 	assert.Contains(t, out, "8.1.0.0")
 	assert.Contains(t, out, "timeout")
+}
+
+// TestInfoAllowWriteRequiresYes pins the confirmation gate on the one info
+// path that mutates a live cluster. Before this gate, `info --allow-write
+// --command 'set-config:...'` needed no confirmation while deleting a single
+// secondary index did: cluster-manager skips its read-only verb whitelist
+// entirely when readOnly=false, so any write verb reached the cluster.
+func TestInfoAllowWriteRequiresYes(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantErr      string // non-empty => expect this substring and no HTTP call
+		wantCalled   bool
+		wantReadOnly bool
+	}{
+		{
+			name:    "--allow-write without --yes is refused",
+			args:    []string{"--allow-write"},
+			wantErr: "confirmation required (--yes)",
+		},
+		{
+			name:         "--allow-write with --yes proceeds",
+			args:         []string{"--allow-write", "--yes"},
+			wantCalled:   true,
+			wantReadOnly: false,
+		},
+		{
+			name:         "--allow-write with -y proceeds",
+			args:         []string{"--allow-write", "-y"},
+			wantCalled:   true,
+			wantReadOnly: false,
+		},
+		{
+			// The read-only default is not destructive, so it must stay
+			// confirmation-free — the gate keys on impact, not on the command.
+			name:         "read-only run needs no confirmation",
+			args:         nil,
+			wantCalled:   true,
+			wantReadOnly: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var body map[string]any
+			called := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"results":[]}`))
+			}))
+			t.Cleanup(srv.Close)
+
+			args := append([]string{
+				"info", "conn-1",
+				"--command", "set-config:context=service;proto-fd-max=20000",
+			}, tc.args...)
+			_, _, err := runInfoCmd(t, srv.URL, args...)
+
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				// The refusal names the environment the operator was about to
+				// mutate, so a wrong-context mistake is visible immediately.
+				assert.Contains(t, err.Error(), "127.0.0.1")
+				assert.False(t, called, "gate must refuse before any HTTP call")
+				return
+			}
+			require.NoError(t, err)
+			assert.True(t, called, "confirmed run must reach the server")
+			assert.Equal(t, tc.wantReadOnly, body["readOnly"])
+		})
+	}
 }

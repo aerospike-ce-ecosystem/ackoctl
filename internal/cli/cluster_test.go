@@ -59,8 +59,8 @@ func paramArgs(params ...string) []string {
 // numbers. The previous map[string]any carried whatever the shell handed over,
 // i.e. strings.
 func TestClusterConfigureNamespaceWireShape(t *testing.T) {
-	body, _, called, err := runConfigureNamespace(t,
-		paramArgs("memorySize=2147483648", "replicationFactor=3")...)
+	args := append(paramArgs("memorySize=2147483648", "replicationFactor=3"), "--yes")
+	body, _, called, err := runConfigureNamespace(t, args...)
 	require.NoError(t, err)
 	require.True(t, called)
 
@@ -75,11 +75,12 @@ func TestClusterConfigureNamespaceWireShape(t *testing.T) {
 	assert.Len(t, body, 3, "body must carry exactly name/memorySize/replicationFactor, got %v", body)
 }
 
-// A complete body needs no confirmation and no warning: nothing is left for the
+// A complete body still needs --yes — the gate is keyed on impact, not on which
+// knobs were supplied — but it must not warn, because nothing is left for the
 // server to fill in.
-func TestClusterConfigureNamespaceBothKnobsNeedNoConfirmation(t *testing.T) {
-	_, stderr, called, err := runConfigureNamespace(t,
-		paramArgs("memorySize=2147483648", "replicationFactor=3")...)
+func TestClusterConfigureNamespaceBothKnobsWarnNothing(t *testing.T) {
+	args := append(paramArgs("memorySize=2147483648", "replicationFactor=3"), "--yes")
+	_, stderr, called, err := runConfigureNamespace(t, args...)
 	require.NoError(t, err)
 	assert.True(t, called)
 	assert.NotContains(t, stderr, "WARNING")
@@ -368,3 +369,30 @@ func TestClusterConfigureNamespaceRejectsBeforeAnyRequest(t *testing.T) {
 
 func ptrInt64(v int64) *int64 { return &v }
 func ptrInt(v int) *int       { return &v }
+
+// The --yes gate is unconditional: a complete body mutates the running namespace
+// just as a partial one does, so it needs confirmation too. The second case is
+// the reason it cannot key on omission — an explicit memorySize=1000000 shrinks a
+// live namespace to 1 MB with nothing omitted at all, so an omission-keyed gate
+// would wave it straight through.
+func TestClusterConfigureNamespaceRequiresYes(t *testing.T) {
+	for _, params := range [][]string{
+		{"memorySize=2147483648", "replicationFactor=3"},
+		{"memorySize=1000000", "replicationFactor=2"}, // explicit shrink to 1 MB
+	} {
+		_, _, called, err := runConfigureNamespace(t, paramArgs(params...)...)
+		require.Error(t, err, "params %v must be refused without --yes", params)
+		assert.Contains(t, err.Error(), "confirmation required (--yes)")
+		// The refusal names the environment, so an operator pointed at the wrong
+		// context sees it before anything is applied.
+		assert.Contains(t, err.Error(), "127.0.0.1")
+		assert.False(t, called, "gate must refuse before any HTTP call")
+	}
+
+	complete := paramArgs("memorySize=2147483648", "replicationFactor=3")
+	for _, flag := range []string{"--yes", "-y"} {
+		_, _, called, err := runConfigureNamespace(t, append(complete, flag)...)
+		require.NoError(t, err, "%s must proceed", flag)
+		assert.True(t, called, "%s must reach the server", flag)
+	}
+}

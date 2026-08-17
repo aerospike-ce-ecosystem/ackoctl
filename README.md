@@ -90,7 +90,7 @@ ackoctl
 ├── note         set | record
 ├── query        exec
 ├── record       list | get | put | delete | delete-bin | query
-├── set          list
+├── set          list | truncate
 ├── udf          list | upload | remove
 ├── upgrade
 └── version

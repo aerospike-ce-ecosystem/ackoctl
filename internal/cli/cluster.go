@@ -56,6 +56,7 @@ func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
 	var (
 		nsName string
 		params []string
+		yes    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "configure-namespace CONN_ID",
@@ -64,10 +65,18 @@ func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
 Namespaces cannot be created at runtime — they must be defined in aerospike.conf.
 
 cluster-manager reads exactly two knobs from this request: memorySize (bytes)
-and replicationFactor. Both must be supplied — the server substitutes its own
-defaults (memorySize=1073741824, replicationFactor=2) for anything omitted and
-applies them to the running namespace, so a partial request would resize it.
-Any other --param key is rejected: the server would drop it silently.
+and replicationFactor. Only the knobs you supply are sent; any other --param
+key is rejected, because the server would drop it silently and still answer
+200.
+
+Supplying just one of the two needs --yes. A cluster-manager without the fix in
+` + clusterManagerOmittedParamFixURL + `
+substitutes its own default for the omitted knob (memorySize=1073741824,
+replicationFactor=2) and applies it to the running namespace, so a one-knob
+change can resize the namespace as a side effect. Read the current values
+first:
+
+  ackoctl info CONN_ID --command 'namespace/<ns>'
 
 For knobs outside those two, use the asinfo passthrough:
 
@@ -78,6 +87,23 @@ For knobs outside those two, use the asinfo passthrough:
 			req, err := buildConfigureNamespaceRequest(nsName, params)
 			if err != nil {
 				return err
+			}
+			// A partial body is safe against a fixed server and unsafe against
+			// today's, so it is gated rather than refused: an operator who wants
+			// to change one knob must not be forced to restate the other, since
+			// restating a value they would have to guess is itself how a live
+			// namespace gets resized. --yes is the only affordance — ackoctl has
+			// no interactive prompt anywhere, by design, so CI cannot hang here.
+			// This whole block becomes unnecessary once the linked fix ships.
+			if omitted := omittedKnobs(req); len(omitted) != 0 {
+				if !yes {
+					return fmt.Errorf(
+						"confirmation required (--yes): %s. A cluster-manager without the fix in %s substitutes its own default and applies it to the running namespace %q. Supply the value explicitly, or pass --yes to accept whatever the server does with it",
+						strings.Join(omitted, "; "), clusterManagerOmittedParamFixURL, nsName)
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(),
+					"ackoctl: WARNING — %s. A cluster-manager without the fix in %s will apply its own default to namespace %q on the running cluster\n",
+					strings.Join(omitted, "; "), clusterManagerOmittedParamFixURL, nsName)
 			}
 			c, err := newClient(cmd, global)
 			if err != nil {
@@ -97,13 +123,23 @@ For knobs outside those two, use the asinfo passthrough:
 	cmd.Flags().StringVar(&nsName, "name", "", "namespace name (required)")
 	// StringArrayVar (not StringSliceVar) is kept even though both accepted
 	// values are plain integers: a value containing a comma must reach the
-	// unknown-key/parse guards below and be reported, not be silently split
-	// into fragments that produce a different error.
+	// unknown-key guard below and be reported, not be silently split into
+	// fragments that produce a different error.
 	cmd.Flags().StringArrayVar(&params, "param", nil,
-		"config knob as key=value; only memorySize=<bytes> and replicationFactor=<1-8> are read by the server, and both are required")
+		"config knob as key=value; only memorySize=<bytes> and replicationFactor=<1-8> are read by the server (repeatable)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false,
+		"confirm sending only one of the two knobs (the server may apply its own default to the other)")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }
+
+// clusterManagerOmittedParamFixURL points at the paired cluster-manager change
+// that makes memorySize/replicationFactor optional and emits only the keys the
+// caller actually supplied. Until a deployment carries it, an omitted knob is
+// replaced by the server's default and applied to the live namespace — which is
+// the only reason the partial-body confirmation below exists. Drop the gate, the
+// warning and this constant once every reachable server has the fix.
+const clusterManagerOmittedParamFixURL = "https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager/pull/478"
 
 // cluster-manager's CreateNamespaceRequest bounds, mirrored client-side so a
 // bad value fails next to the typo instead of after a round-trip. See
@@ -115,22 +151,37 @@ const (
 	maxReplicationFactor   = 8
 )
 
-// Server-side defaults for the two knobs, quoted in the error that demands both
-// be supplied. These are what an omitted field is replaced with before the
-// handler interpolates it into a live set-config.
+// Server-side defaults, quoted back to the operator when a knob is omitted.
+// These are what a pre-fix cluster-manager substitutes before interpolating the
+// value into a live set-config.
 const (
 	serverDefaultMemorySize        = 1_073_741_824
 	serverDefaultReplicationFactor = 2
 )
 
+// omittedKnobs describes the accepted knobs the operator did not supply, in a
+// stable order, each paired with the default a pre-fix cluster-manager puts
+// there instead. Empty when the body is complete, so callers can treat a
+// non-empty result as "this request depends on server-side defaults".
+func omittedKnobs(req client.ConfigureNamespaceRequest) []string {
+	var out []string
+	if req.MemorySize == nil {
+		out = append(out, fmt.Sprintf("memorySize was not supplied (server default: %d bytes)", serverDefaultMemorySize))
+	}
+	if req.ReplicationFactor == nil {
+		out = append(out, fmt.Sprintf("replicationFactor was not supplied (server default: %d)", serverDefaultReplicationFactor))
+	}
+	return out
+}
+
 // buildConfigureNamespaceRequest turns --param key=value pairs into the typed
-// request body.
+// request body, carrying only the knobs the operator supplied.
 //
-// The restriction to memorySize/replicationFactor is a data-availability guard,
-// not tidiness. cluster-manager's CreateNamespaceRequest declares only those
-// two knobs plus `name` and sets no `extra=`, so Pydantic's default
-// extra="ignore" drops every other key — then the handler interpolates
-// body.memorySize and body.replicationFactor, defaults included, into
+// The allowlist is a data-availability guard, not tidiness. cluster-manager's
+// CreateNamespaceRequest declares only memorySize/replicationFactor plus `name`
+// and sets no `extra=`, so Pydantic's default extra="ignore" drops every other
+// key — then the handler interpolates body.memorySize and
+// body.replicationFactor, defaults included, into
 //
 //	set-config:context=namespace;id=<ns>;memory-size=…;replication-factor=…
 //
@@ -139,17 +190,25 @@ const (
 // dropped both knobs AND shrank the namespace to 1 GiB at replication factor 2,
 // while the CLI printed "configured successfully" and exited 0.
 //
-// Both fields are therefore required rather than optional-and-omitted: with an
-// unpatched server, omitting one is indistinguishable from asking for the
-// default, and the default is applied to a live namespace. Requiring both means
-// every value the server acts on is one the operator typed.
+// A partial body is deliberately allowed. Requiring both knobs would force an
+// operator changing only the replication factor to restate a memory size they
+// may have to guess, which is the same hazard by another route. The risk that an
+// omitted knob is filled in by a pre-fix server is handled by the caller's
+// confirmation gate, not by refusing here.
 func buildConfigureNamespaceRequest(nsName string, params []string) (client.ConfigureNamespaceRequest, error) {
 	// The cluster-manager body schema names the namespace field `name` (see
 	// CreateNamespaceRequest in api/models/cluster.py). An earlier build sent
 	// `namespace`, which the server rejected with HTTP 422
 	// ({"loc":["body","name"],"msg":"Field required"}).
 	req := client.ConfigureNamespaceRequest{Name: nsName}
-	var memorySet, rfSet bool
+
+	// Require at least one --param: a request carrying only the namespace name
+	// is a no-op the server would either reject or silently apply nothing for.
+	// Failing fast tells the user the command did nothing because they forgot
+	// to pass a parameter.
+	if len(params) == 0 {
+		return req, fmt.Errorf("at least one --param key=value is required")
+	}
 
 	for _, p := range params {
 		k, v, ok := strings.Cut(p, "=")
@@ -171,7 +230,7 @@ func buildConfigureNamespaceRequest(nsName string, params []string) (client.Conf
 			// A repeated key would silently overwrite the earlier value
 			// (--param x=1 --param x=2 quietly drops x=1). For a config
 			// mutation that is a foot-gun, so reject the collision.
-			if memorySet {
+			if req.MemorySize != nil {
 				return req, fmt.Errorf("--param %q specified more than once", k)
 			}
 			n, err := strconv.ParseInt(v, 10, 64)
@@ -181,9 +240,9 @@ func buildConfigureNamespaceRequest(nsName string, params []string) (client.Conf
 			if n < minNamespaceMemorySize {
 				return req, fmt.Errorf("--param memorySize=%d is below the server minimum of %d bytes", n, minNamespaceMemorySize)
 			}
-			req.MemorySize, memorySet = n, true
+			req.MemorySize = &n
 		case "replicationFactor":
-			if rfSet {
+			if req.ReplicationFactor != nil {
 				return req, fmt.Errorf("--param %q specified more than once", k)
 			}
 			n, err := strconv.Atoi(v)
@@ -193,21 +252,13 @@ func buildConfigureNamespaceRequest(nsName string, params []string) (client.Conf
 			if n < minReplicationFactor || n > maxReplicationFactor {
 				return req, fmt.Errorf("--param replicationFactor=%d is outside the server range %d-%d", n, minReplicationFactor, maxReplicationFactor)
 			}
-			req.ReplicationFactor, rfSet = n, true
+			req.ReplicationFactor = &n
 		default:
 			return req, fmt.Errorf(
 				"--param %q would be silently ignored: cluster-manager reads only memorySize and replicationFactor from this request. "+
 					"Apply other knobs with `ackoctl info CONN_ID --allow-write --command 'set-config:context=namespace;id=%s;%s=%s'`",
 				k, nsName, k, v)
 		}
-	}
-
-	if !memorySet || !rfSet {
-		return req, fmt.Errorf(
-			"--param memorySize=<bytes> and --param replicationFactor=<%d-%d> are both required: "+
-				"cluster-manager replaces an omitted field with its own default (memorySize=%d, replicationFactor=%d) "+
-				"and applies it to the running namespace, so a partial request would resize it",
-			minReplicationFactor, maxReplicationFactor, serverDefaultMemorySize, serverDefaultReplicationFactor)
 	}
 	return req, nil
 }

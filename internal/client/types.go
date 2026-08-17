@@ -151,23 +151,21 @@ type K8sPodLogs struct {
 // ConfigureNamespaceRequest mirrors cluster-manager's CreateNamespaceRequest
 // (api/src/aerospike_cluster_manager_api/models/cluster.py). The server
 // declares exactly these three fields and sets no `extra=`, so Pydantic's
-// default extra="ignore" drops every other key without a word — and both
-// numeric fields carry defaults (1 GiB, replication factor 2) that the handler
-// interpolates straight into a live `set-config`. A `map[string]any` hid that:
-// it looked like a pass-through for "the server's evolving knobs" while in
-// fact only these three fields were ever read. Spelling the contract out in Go
-// is what makes the omission visible at the call site.
+// default extra="ignore" drops every other key without a word. A
+// `map[string]any` hid that: it looked like a pass-through for "the server's
+// evolving knobs" while in fact only these three fields were ever read.
+// Spelling the contract out in Go is what makes that visible at the call site.
 //
-// Both numeric fields are always populated by the CLI. Omitting either would
-// let the server's default fill the gap and resize a running namespace, which
-// is exactly the hazard this type exists to prevent, so neither carries
-// omitempty.
+// The two numeric fields are pointers with omitempty so an unsupplied knob is
+// absent from the JSON body rather than sent as a zero. The CLI must be able to
+// change one knob without restating the other — restating a value the operator
+// would have to guess is itself how a live namespace gets resized.
 type ConfigureNamespaceRequest struct {
 	Name string `json:"name"`
 	// MemorySize is a byte count, so int64 — a namespace larger than 2 GiB
 	// would overflow a 32-bit int.
-	MemorySize        int64 `json:"memorySize"`
-	ReplicationFactor int   `json:"replicationFactor"`
+	MemorySize        *int64 `json:"memorySize,omitempty"`
+	ReplicationFactor *int   `json:"replicationFactor,omitempty"`
 }
 
 // RecordKey mirrors cluster-manager's RecordKey.

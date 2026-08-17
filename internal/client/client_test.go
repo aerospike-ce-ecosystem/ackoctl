@@ -202,10 +202,11 @@ func TestConfigureNamespaceReturnsMessage(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"message":"applied 2 changes"}`))
 	})
+	mem, rf := int64(2147483648), 3
 	msg, err := c.ConfigureNamespace(context.Background(), "conn-1", ConfigureNamespaceRequest{
 		Name:              "test",
-		MemorySize:        2147483648,
-		ReplicationFactor: 3,
+		MemorySize:        &mem,
+		ReplicationFactor: &rf,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "applied 2 changes", msg)
@@ -216,6 +217,25 @@ func TestConfigureNamespaceReturnsMessage(t *testing.T) {
 		"memorySize":        float64(2147483648),
 		"replicationFactor": float64(3),
 	}, body)
+}
+
+// A nil knob must be absent from the JSON body, not sent as a zero: the omitted
+// key is what lets a fixed cluster-manager leave that setting alone.
+func TestConfigureNamespaceOmitsUnsetKnobs(t *testing.T) {
+	var body map[string]any
+	c, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":"ok"}`))
+	})
+	rf := 3
+	_, err := c.ConfigureNamespace(context.Background(), "conn-1", ConfigureNamespaceRequest{
+		Name:              "test",
+		ReplicationFactor: &rf,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"name": "test", "replicationFactor": float64(3)}, body)
+	assert.NotContains(t, body, "memorySize", "an unset knob must not appear on the wire at all")
 }
 
 func TestK8sListAndReconcile(t *testing.T) {

@@ -71,7 +71,8 @@ ackoctl cluster info <CONN_ID> -o yaml
 # Aerospike CE does NOT support creating namespaces at runtime — they live
 # in aerospike.conf.
 #
-# Both knobs are required. See the warning below before you run this.
+# Only memorySize and replicationFactor are accepted. Read the section below
+# before changing just one of them.
 ackoctl cluster configure-namespace <CONN_ID> \
   --name=test \
   --param=memorySize=2147483648 \
@@ -80,22 +81,45 @@ ackoctl cluster configure-namespace <CONN_ID> \
 
 ### configure-namespace reads only two knobs
 
-Cluster Manager's `CreateNamespaceRequest` declares exactly three fields — `name`, `memorySize` (bytes), and `replicationFactor` — and ignores every other key in the body. It then applies **both** numeric fields to the running namespace via a single `set-config`:
+Cluster Manager's `CreateNamespaceRequest` declares exactly three fields — `name`, `memorySize` (bytes), and `replicationFactor` — and ignores every other key in the body. It then applies the numeric fields to the running namespace via a single `set-config`:
 
 ```
 set-config:context=namespace;id=<ns>;memory-size=<memorySize>;replication-factor=<replicationFactor>
 ```
 
-Two consequences:
+So:
 
-- **Any other `--param` key is rejected client-side.** The server would drop it silently and still return 200, so `ackoctl` refuses rather than let you believe a setting was applied.
-- **`memorySize` and `replicationFactor` must both be supplied.** The server substitutes its own defaults (`memorySize=1073741824` — 1 GiB — and `replicationFactor=2`) for anything omitted and applies them to the live namespace. A partial request would therefore shrink a larger namespace to 1 GiB and force RF 2, risking eviction or stop-writes. Requiring both means every value the server acts on is one you typed.
+- **Any other `--param` key is rejected client-side.** The server would drop it silently and still return 200, so `ackoctl` refuses rather than let you believe a setting was applied. Use the asinfo passthrough for those (below).
+- **`ackoctl` sends only the knobs you supply.** You can change the replication factor without restating the memory size.
 
-Read the current values first, then set both:
+#### Changing only one knob
+
+A Cluster Manager deployment that predates [aerospike-cluster-manager#478](https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager/pull/478) substitutes its **own default** for whichever knob you omit — `memorySize=1073741824` (1 GiB) or `replicationFactor=2` — and applies it to the live namespace. Changing one knob on such a server can therefore shrink a larger namespace to 1 GiB or reset its replication factor as a side effect, risking eviction or stop-writes.
+
+`ackoctl` gates the one-knob form on `--yes/-y` and names the field at risk:
+
+```console
+$ ackoctl cluster configure-namespace <CONN_ID> --name=test --param=replicationFactor=3
+Error: confirmation required (--yes): memorySize was not supplied (server default: 1073741824 bytes). A cluster-manager without the fix in https://github.com/aerospike-ce-ecosystem/aerospike-cluster-manager/pull/478 substitutes its own default and applies it to the running namespace "test". Supply the value explicitly, or pass --yes to accept whatever the server does with it
+```
+
+Two safe ways forward. Either read the current value and pass both knobs:
 
 ```bash
 ackoctl info <CONN_ID> --command='namespace/test' | tr ';' '\n' | grep -E 'memory-size|replication-factor'
+
+ackoctl cluster configure-namespace <CONN_ID> --name=test \
+  --param=memorySize=<current value> \
+  --param=replicationFactor=3
 ```
+
+Or, on a server that already carries the fix, confirm the one-knob change:
+
+```bash
+ackoctl cluster configure-namespace <CONN_ID> --name=test --param=replicationFactor=3 --yes
+```
+
+The confirmation and its warning exist only for pre-#478 servers; once every deployment you talk to carries that fix, the one-knob form is safe on its own.
 
 For any knob outside those two, use the asinfo passthrough:
 

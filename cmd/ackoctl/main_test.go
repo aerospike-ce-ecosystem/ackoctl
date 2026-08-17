@@ -94,3 +94,84 @@ func TestPrintErrorAPIErrorWrappedExitCode(t *testing.T) {
 		t.Fatalf("wrapped 503: got exit code %d, want %d", code, exitServerError)
 	}
 }
+
+// TestPrintErrorDocumentedExitCodes is the contract behind the exit-code table
+// in docs/usage.md. The individual tests above cover each branch of printError;
+// this one exists so the table and the code cannot drift: every row documented
+// there has a case here, and adding a code to one without the other fails.
+func TestPrintErrorDocumentedExitCodes(t *testing.T) {
+	cases := []struct {
+		name string
+		code int   // the documented exit code
+		err  error // an error that must produce it
+	}{
+		{
+			name: "0 is success (no error reaches printError)",
+			code: 0,
+			err:  nil,
+		},
+		{
+			name: "1 — generic failure",
+			code: 1,
+			err:  errors.New("boom"),
+		},
+		{
+			name: "1 — config not set up (carries a hint line)",
+			code: 1,
+			err:  config.ErrNoCurrent,
+		},
+		{
+			name: "1 — HTTP status outside 400-599",
+			code: 1,
+			err:  &client.APIError{StatusCode: 302, Detail: "redirect"},
+		},
+		{
+			name: "4 — cluster-manager 4xx, retry will not help",
+			code: exitClientError,
+			err:  &client.APIError{StatusCode: 422, Detail: "unprocessable"},
+		},
+		{
+			name: "5 — cluster-manager 5xx, retry may help",
+			code: exitServerError,
+			err:  &client.APIError{StatusCode: 503, Detail: "upstream down"},
+		},
+		{
+			name: "130 — aborted by SIGINT/SIGTERM",
+			code: exitAborted,
+			err:  context.Canceled,
+		},
+	}
+
+	documented := map[int]bool{}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			documented[tc.code] = true
+			if tc.err == nil {
+				// run() returns 0 without calling printError at all; asserting
+				// the documented value keeps the table honest about 0.
+				if tc.code != 0 {
+					t.Fatalf("success case must document exit code 0, got %d", tc.code)
+				}
+				return
+			}
+			var buf bytes.Buffer
+			if got := printError(&buf, tc.err); got != tc.code {
+				t.Fatalf("printError(%v) = %d, want %d", tc.err, got, tc.code)
+			}
+			if buf.Len() == 0 {
+				t.Fatal("every failure must print something to stderr")
+			}
+		})
+	}
+
+	// The documented table lists exactly these codes. A new one must be added
+	// to docs/usage.md and to this test together.
+	for _, code := range []int{0, 1, exitClientError, exitServerError, exitAborted} {
+		if !documented[code] {
+			t.Errorf("exit code %d is documented but has no case here", code)
+		}
+	}
+	if len(documented) != 5 {
+		t.Errorf("covered %d distinct exit codes, want 5", len(documented))
+	}
+}

@@ -70,10 +70,38 @@ ackoctl cluster info <CONN_ID> -o yaml
 # Tune runtime-mutable namespace knobs (asinfo set-config under the hood).
 # Aerospike CE does NOT support creating namespaces at runtime — they live
 # in aerospike.conf.
+#
+# Both knobs are required. See the warning below before you run this.
 ackoctl cluster configure-namespace <CONN_ID> \
   --name=test \
-  --param=high-water-disk-pct=70 \
-  --param=stop-writes-pct=90
+  --param=memorySize=2147483648 \
+  --param=replicationFactor=2
+```
+
+### configure-namespace reads only two knobs
+
+Cluster Manager's `CreateNamespaceRequest` declares exactly three fields — `name`, `memorySize` (bytes), and `replicationFactor` — and ignores every other key in the body. It then applies **both** numeric fields to the running namespace via a single `set-config`:
+
+```
+set-config:context=namespace;id=<ns>;memory-size=<memorySize>;replication-factor=<replicationFactor>
+```
+
+Two consequences:
+
+- **Any other `--param` key is rejected client-side.** The server would drop it silently and still return 200, so `ackoctl` refuses rather than let you believe a setting was applied.
+- **`memorySize` and `replicationFactor` must both be supplied.** The server substitutes its own defaults (`memorySize=1073741824` — 1 GiB — and `replicationFactor=2`) for anything omitted and applies them to the live namespace. A partial request would therefore shrink a larger namespace to 1 GiB and force RF 2, risking eviction or stop-writes. Requiring both means every value the server acts on is one you typed.
+
+Read the current values first, then set both:
+
+```bash
+ackoctl info <CONN_ID> --command='namespace/test' | tr ';' '\n' | grep -E 'memory-size|replication-factor'
+```
+
+For any knob outside those two, use the asinfo passthrough:
+
+```bash
+ackoctl info <CONN_ID> --allow-write \
+  --command='set-config:context=namespace;id=test;high-water-disk-pct=70'
 ```
 
 ---
@@ -120,14 +148,29 @@ Use `--pk-type` to set the particle type (`auto|string|int|bytes`). With `auto`,
 
 ---
 
-## set — derived set inventory
+## set — derived set inventory and truncate
 
 ```bash
 ackoctl set list <CONN_ID>                       # all namespaces
 ackoctl set list <CONN_ID> --namespace=test      # one namespace
+
+# Wipe every record in a set. Destructive: --yes/-y is mandatory.
+ackoctl set truncate <CONN_ID> --namespace=test --set=users --yes
+
+# Truncate only records last updated before a nanosecond cutoff
+# (since the CITRUS epoch, 2010-01-01 UTC)
+ackoctl set truncate <CONN_ID> --namespace=test --set=users \
+  --before-lut=473342400000000000 --yes
 ```
 
-The server has no dedicated `/sets` endpoint. `ackoctl` reads the cluster information response and extracts `namespaces[].sets[]`.
+`set list` has no dedicated server endpoint. `ackoctl` reads the cluster information response and extracts `namespaces[].sets[]`.
+
+`set truncate` removes records permanently — there is no undo, and Aerospike applies it asynchronously across the cluster. Notes:
+
+- `--yes/-y` is required. `ackoctl` has no interactive prompt, so this is the only confirmation.
+- Omit `--before-lut` to wipe the whole set. When given, only records whose last-update-time is **below** the cutoff are truncated.
+- `--before-lut=0` is rejected client-side and server-side: at the asinfo layer `lut=0` means "truncate everything", so omitting the flag is the explicit way to ask for that.
+- Cluster Manager rate-limits this endpoint to **10 requests per minute**; beyond that you get HTTP 429 (exit code 4).
 
 ---
 
@@ -263,3 +306,32 @@ cluster-manager validates `--filename` against `^[a-zA-Z0-9_.-]{1,255}$`; invali
 - single-resource commands (get, info, health) fall back to a key/value tree.
 
 If a future schema change misaligns the table view, prefer `-o yaml` until ackoctl is updated.
+
+---
+
+## Exit codes
+
+`ackoctl` returns structured exit codes so a script can tell a caller-side mistake from a server problem from a user abort, without parsing stderr.
+
+| Code | Meaning | Retry? |
+|------|---------|--------|
+| `0` | Success. | — |
+| `1` | Generic failure: bad flags, client-side validation, transport or parse error, missing/unusable config, or an HTTP status outside 400–599. | No — fix the invocation. |
+| `4` | Cluster Manager returned **4xx** (bad request, auth, not found, 422 validation, 429 rate limit). | No — the request itself is wrong. |
+| `5` | Cluster Manager returned **5xx** (upstream or transient server failure). | Yes — a retry may succeed. |
+| `130` | Aborted by `SIGINT` (ctrl-c) or `SIGTERM`. Follows the shell's `128 + signal` convention. | N/A |
+
+Every failure also writes one `Error: …` line to stderr; stdout carries only command output.
+
+```bash
+ackoctl record get "$CONN" --namespace=test --set=users --pk=alice -o json
+case $? in
+  0)   ;;                                       # got the record
+  4)   echo "bad request or missing record" >&2; exit 1 ;;
+  5)   sleep 5; exec "$0" "$@" ;;               # transient — retry
+  130) echo "aborted" >&2; exit 130 ;;
+  *)   echo "ackoctl failed" >&2; exit 1 ;;
+esac
+```
+
+A config error (no current context, unknown context) exits `1` and adds a `hint:` line pointing at `ackoctl config set-context`.

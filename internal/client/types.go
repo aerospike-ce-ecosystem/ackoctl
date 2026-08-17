@@ -148,11 +148,27 @@ type K8sPodLogs struct {
 	SinceSeconds *int   `json:"sinceSeconds,omitempty"`
 }
 
-// ConfigureNamespaceRequest is a minimal contract — the cluster-manager
-// CreateNamespaceRequest body accepts a namespace name plus dynamic config
-// key/value pairs. We pass it through as a map to avoid drifting against the
-// server's evolving knobs.
-type ConfigureNamespaceRequest map[string]any
+// ConfigureNamespaceRequest mirrors cluster-manager's CreateNamespaceRequest
+// (api/src/aerospike_cluster_manager_api/models/cluster.py). The server
+// declares exactly these three fields and sets no `extra=`, so Pydantic's
+// default extra="ignore" drops every other key without a word — and both
+// numeric fields carry defaults (1 GiB, replication factor 2) that the handler
+// interpolates straight into a live `set-config`. A `map[string]any` hid that:
+// it looked like a pass-through for "the server's evolving knobs" while in
+// fact only these three fields were ever read. Spelling the contract out in Go
+// is what makes the omission visible at the call site.
+//
+// Both numeric fields are always populated by the CLI. Omitting either would
+// let the server's default fill the gap and resize a running namespace, which
+// is exactly the hazard this type exists to prevent, so neither carries
+// omitempty.
+type ConfigureNamespaceRequest struct {
+	Name string `json:"name"`
+	// MemorySize is a byte count, so int64 — a namespace larger than 2 GiB
+	// would overflow a 32-bit int.
+	MemorySize        int64 `json:"memorySize"`
+	ReplicationFactor int   `json:"replicationFactor"`
+}
 
 // RecordKey mirrors cluster-manager's RecordKey.
 type RecordKey struct {

@@ -87,6 +87,13 @@ func TestValidateTag(t *testing.T) {
 		"v1.2.3-nightly.20260817",
 		"v1.2.3+build.5",
 		"v1.2.3-rc.1.build-2",
+		// Pre-release AND build metadata together — valid semver 2.0.0, and
+		// rejected by the earlier single-group pattern. LatestTag holds
+		// GitHub's Location header to this same pattern, so rejecting these
+		// would hard-fail `upgrade` for every user off one upstream tag.
+		"v1.2.3-rc.1+build.5",
+		"v1.0.0-x.7.z.92+exp.sha.5114f85",
+		"v1.0.0-0.3.7",
 	}
 	for _, tag := range valid {
 		t.Run("valid/"+tag, func(t *testing.T) {
@@ -111,6 +118,9 @@ func TestValidateTag(t *testing.T) {
 		"v1.2.3 ",              // trailing space
 		"v1.-2.3",              // sign in a version field
 		"v1.2.3-",              // empty pre-release suffix
+		"v1.2.3+",              // empty build-metadata suffix
+		"v1.2.3-a/b",           // separator inside a pre-release suffix
+		"v1.2.3\n",             // embedded newline
 		"v1.2.3_rc1",           // underscore is not a semver separator
 		"vv1.2.3",              // doubled prefix
 	}

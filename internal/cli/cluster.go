@@ -67,11 +67,13 @@ The change lands on a running namespace, so this command requires --yes/-y.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// A set-config against a live namespace is as destructive as the
-			// eleven sites that already gate on --yes — a wrong value can push a
-			// namespace into eviction or stop-writes. Checked first, as at every
-			// other gated site. --yes is the only affordance; ackoctl has no
-			// interactive prompt anywhere, by design, so this can never hang
-			// in CI.
+			// eleven pre-existing sites that gate on --yes — a wrong value can
+			// push a namespace into eviction or stop-writes. The gate is keyed on
+			// impact, so it is unconditional; it deliberately says nothing about
+			// where in RunE it sits, because a follow-up that adds --param
+			// validation will want the input errors reported first. --yes is the
+			// only affordance; ackoctl has no interactive prompt anywhere, by
+			// design, so this can never hang in CI.
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes): configure-namespace mutates a live namespace on %s", mutationTarget(global))
 			}

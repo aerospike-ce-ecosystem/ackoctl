@@ -35,10 +35,17 @@ const (
 // both AssetURL and ChecksumsURL at a different repository's release assets.
 // Because checksums.txt is fetched from the same tag-derived location, the
 // sha256 check would then verify the substituted archive against its own
-// checksum file and pass. Anchored, digits-only version fields with an
-// optional pre-release / build-metadata suffix leaves no room for a separator
-// (`/`), a dot-dot segment, or percent-encoding.
-var tagPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$`)
+// checksum file and pass. Anchored, digits-only version fields leave no room
+// for a separator (`/`), a dot-dot segment, or percent-encoding.
+//
+// Pre-release and build metadata are separate optional groups, in that order,
+// per semver 2.0.0 — they can appear together (`v1.2.3-rc.1+build.5`). Folding
+// them into one `[-+]`-introduced group would reject that, and since LatestTag
+// holds GitHub's `Location` header to this same pattern, one upstream release
+// tagged that way would hard-fail `upgrade` for every user. Neither group's
+// character class admits `/` or `%`, so a `..` inside a suffix cannot become a
+// `..` path *segment*.
+var tagPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`)
 
 // ValidateTag rejects a release tag that is not a plain semver tag with a
 // leading `v`. Call it before interpolating a tag into any URL — parseSemver

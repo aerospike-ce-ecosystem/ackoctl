@@ -41,11 +41,13 @@ requires --yes/-y. Read-only runs (the default) need no confirmation.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// --allow-write makes cluster-manager skip its read-only verb
 			// whitelist entirely, so any set-config: reaches the live cluster.
-			// That is at least as destructive as the eleven sites that already
-			// gate on --yes, and the gate belongs on impact, not on the verb
-			// spelling. Checked first, as at every other gated site. --yes is
-			// the only affordance — there is no interactive prompt anywhere in
-			// ackoctl, by design, so CI can never hang here.
+			// That is at least as destructive as the eleven pre-existing sites
+			// that gate on --yes, and the gate belongs on impact, not on the verb
+			// spelling. It is also the only guard on this path: cluster-manager
+			// hardens its read-only info route but leaves readOnly=false ungated
+			// server-side by design, and --allow-write drives exactly that route.
+			// --yes is the only affordance — there is no interactive prompt
+			// anywhere in ackoctl, by design, so CI can never hang here.
 			if allowWrite && !yes {
 				return fmt.Errorf("confirmation required (--yes): --allow-write forwards write verbs to %s", mutationTarget(global))
 			}

@@ -139,22 +139,30 @@ func TestParseSemverIsNotATagValidator(t *testing.T) {
 
 // A tag that fails validation must never make it into a URL, so LatestTag
 // applies the same guard to GitHub's Location header as to a --version value.
+//
+// Each tag below starts with `v`, so the old leading-`v` check let it straight
+// through into AssetURL/ChecksumsURL — a bare "nightly" would prove nothing
+// here because the old check already rejected that.
 func TestLatestTagRejectsNonSemverLocation(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Location", "https://example.test/aerospike-ce-ecosystem/ackoctl/releases/tag/nightly")
-		w.WriteHeader(http.StatusFound)
-	}))
-	defer srv.Close()
+	for _, tag := range []string{"vlatest", "v1.2", "v1.2.3.4", "v1.2.3-/../../x"} {
+		t.Run(tag, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Location", "https://example.test/aerospike-ce-ecosystem/ackoctl/releases/tag/"+tag)
+				w.WriteHeader(http.StatusFound)
+			}))
+			defer srv.Close()
 
-	c := &Client{
-		HTTP: &http.Client{
-			CheckRedirect: func(*http.Request, []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		},
-		BaseURL: srv.URL,
-	}
-	if _, err := c.LatestTag(context.Background()); err == nil {
-		t.Fatal("expected error on non-semver tag, got nil")
+			c := &Client{
+				HTTP: &http.Client{
+					CheckRedirect: func(*http.Request, []*http.Request) error {
+						return http.ErrUseLastResponse
+					},
+				},
+				BaseURL: srv.URL,
+			}
+			if _, err := c.LatestTag(context.Background()); err == nil {
+				t.Fatalf("LatestTag accepted %q from the Location header, want an error", tag)
+			}
+		})
 	}
 }

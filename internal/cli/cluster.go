@@ -55,14 +55,28 @@ func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
 	var (
 		nsName string
 		params []string
+		yes    bool
 	)
 	cmd := &cobra.Command{
 		Use:   "configure-namespace CONN_ID",
 		Short: "Tune runtime-mutable params of an existing Aerospike namespace",
 		Long: `cluster-manager applies dynamic config changes via asinfo set-config.
-Namespaces cannot be created at runtime — they must be defined in aerospike.conf.`,
+Namespaces cannot be created at runtime — they must be defined in aerospike.conf.
+
+The change lands on a running namespace, so this command requires --yes/-y.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// A set-config against a live namespace is as destructive as the
+			// eleven pre-existing sites that gate on --yes — a wrong value can
+			// push a namespace into eviction or stop-writes. The gate is keyed on
+			// impact, so it is unconditional; it deliberately says nothing about
+			// where in RunE it sits, because a follow-up that adds --param
+			// validation will want the input errors reported first. --yes is the
+			// only affordance; ackoctl has no interactive prompt anywhere, by
+			// design, so this can never hang in CI.
+			if !yes {
+				return fmt.Errorf("confirmation required (--yes): configure-namespace mutates a live namespace on %s", mutationTarget(global))
+			}
 			// Require at least one --param: a request carrying only the
 			// namespace name is a no-op the server would either reject or
 			// silently apply nothing for. Failing fast tells the user the
@@ -120,6 +134,7 @@ Namespaces cannot be created at runtime — they must be defined in aerospike.co
 	// "storage-engine=device,/dev/sda" contain commas that StringSliceVar would
 	// otherwise split into pieces, failing the key=value check below.
 	cmd.Flags().StringArrayVar(&params, "param", nil, "runtime-tunable parameter as key=value (repeatable)")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm live-namespace config mutation")
 	_ = cmd.MarkFlagRequired("name")
 	return cmd
 }

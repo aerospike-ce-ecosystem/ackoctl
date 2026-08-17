@@ -68,6 +68,17 @@ func redactConfigTokens(cfg *config.Config) *config.Config {
 	return &out
 }
 
+// insecureCell renders the INSECURE column. The unsafe state gets the loud
+// value and the safe state stays blank, so a `config view` with many contexts
+// draws the eye to the ones that skip certificate verification instead of
+// filling the column with "false".
+func insecureCell(skip bool) string {
+	if skip {
+		return "yes (TLS verification skipped)"
+	}
+	return ""
+}
+
 func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:   "view",
@@ -92,14 +103,18 @@ func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 			cfg = redactConfigTokens(cfg)
 			return output.Print(cmd.OutOrStdout(), format, cfg,
 				output.WithTable(
-					[]string{"CURRENT", "NAME", "SERVER", "WORKSPACE"},
+					// INSECURE is shown because --insecure-skip-tls is persisted
+					// by set-context and is otherwise invisible in the default
+					// view: an operator auditing which contexts are safe had to
+					// read the YAML by hand or pass -o json.
+					[]string{"CURRENT", "NAME", "SERVER", "WORKSPACE", "INSECURE"},
 					func(v any) []string {
 						c := v.(config.Context)
 						marker := ""
 						if cfg.CurrentContext == c.Name {
 							marker = "*"
 						}
-						return []string{marker, c.Name, c.Server, c.WorkspaceID}
+						return []string{marker, c.Name, c.Server, c.WorkspaceID, insecureCell(c.InsecureSkipTLS)}
 					},
 					func(any) []any {
 						out := make([]any, 0, len(cfg.Contexts))

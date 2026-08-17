@@ -71,3 +71,108 @@ func TestAssetName(t *testing.T) {
 		t.Errorf("AssetName = %q, want %q", got, want)
 	}
 }
+
+// TestValidateTag pins the guard that keeps a release tag from reshaping the
+// URL it is interpolated into. Both AssetURL and ChecksumsURL derive their path
+// from the tag, so a tag carrying path syntax redirects the archive AND its
+// checksums.txt to the same substituted location — the sha256 check then
+// verifies the substituted archive against its own checksums and passes.
+func TestValidateTag(t *testing.T) {
+	valid := []string{
+		"v0.1.0",
+		"v1.2.3",
+		"v10.20.30",
+		"v0.0.0",
+		"v1.2.3-rc1",
+		"v1.2.3-nightly.20260817",
+		"v1.2.3+build.5",
+		"v1.2.3-rc.1.build-2",
+		// Pre-release AND build metadata together — valid semver 2.0.0, and
+		// rejected by the earlier single-group pattern. LatestTag holds
+		// GitHub's Location header to this same pattern, so rejecting these
+		// would hard-fail `upgrade` for every user off one upstream tag.
+		"v1.2.3-rc.1+build.5",
+		"v1.0.0-x.7.z.92+exp.sha.5114f85",
+		"v1.0.0-0.3.7",
+	}
+	for _, tag := range valid {
+		t.Run("valid/"+tag, func(t *testing.T) {
+			if err := ValidateTag(tag); err != nil {
+				t.Fatalf("ValidateTag(%q) = %v, want nil", tag, err)
+			}
+		})
+	}
+
+	invalid := []string{
+		"",                     // no tag at all
+		"0.1.0",                // missing leading v — callers normalise first
+		"v1.2",                 // not three fields
+		"v1.2.3.4",             // too many fields
+		"latest",               // not a version
+		"v1.2.3/extra",         // separator: escapes the tag path segment
+		"v../../other/repo/v1", // dot-dot: normalises toward another repository
+		"v1.2.3/../../x",       // dot-dot after a valid-looking prefix
+		"v1.2.3%2f..%2fx",      // percent-encoded separator
+		"v1.2.3?x=1",           // query string appended to the path
+		"v1.2.3#frag",          // fragment
+		"v1.2.3 ",              // trailing space
+		"v1.-2.3",              // sign in a version field
+		"v1.2.3-",              // empty pre-release suffix
+		"v1.2.3+",              // empty build-metadata suffix
+		"v1.2.3-a/b",           // separator inside a pre-release suffix
+		"v1.2.3\n",             // embedded newline
+		"v1.2.3_rc1",           // underscore is not a semver separator
+		"vv1.2.3",              // doubled prefix
+	}
+	for _, tag := range invalid {
+		t.Run("invalid/"+tag, func(t *testing.T) {
+			if err := ValidateTag(tag); err == nil {
+				t.Fatalf("ValidateTag(%q) = nil, want an error", tag)
+			}
+		})
+	}
+}
+
+// parseSemver is deliberately lenient — it drops everything after the first
+// `-`/`+` before parsing — so it cannot stand in for ValidateTag. This test
+// documents that difference so nobody "simplifies" ValidateTag into a
+// parseSemver call.
+func TestParseSemverIsNotATagValidator(t *testing.T) {
+	const hostile = "v1.2.3-/../../other/repo/releases/download/v1"
+	if _, ok := parseSemver(hostile); !ok {
+		t.Fatalf("parseSemver(%q) rejected the input; this test no longer documents anything", hostile)
+	}
+	if err := ValidateTag(hostile); err == nil {
+		t.Fatalf("ValidateTag(%q) = nil, want an error", hostile)
+	}
+}
+
+// A tag that fails validation must never make it into a URL, so LatestTag
+// applies the same guard to GitHub's Location header as to a --version value.
+//
+// Each tag below starts with `v`, so the old leading-`v` check let it straight
+// through into AssetURL/ChecksumsURL — a bare "nightly" would prove nothing
+// here because the old check already rejected that.
+func TestLatestTagRejectsNonSemverLocation(t *testing.T) {
+	for _, tag := range []string{"vlatest", "v1.2", "v1.2.3.4", "v1.2.3-/../../x"} {
+		t.Run(tag, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Location", "https://example.test/aerospike-ce-ecosystem/ackoctl/releases/tag/"+tag)
+				w.WriteHeader(http.StatusFound)
+			}))
+			defer srv.Close()
+
+			c := &Client{
+				HTTP: &http.Client{
+					CheckRedirect: func(*http.Request, []*http.Request) error {
+						return http.ErrUseLastResponse
+					},
+				},
+				BaseURL: srv.URL,
+			}
+			if _, err := c.LatestTag(context.Background()); err == nil {
+				t.Fatalf("LatestTag accepted %q from the Location header, want an error", tag)
+			}
+		})
+	}
+}

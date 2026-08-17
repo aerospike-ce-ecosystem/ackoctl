@@ -12,12 +12,31 @@
 | `--token TOKEN` | One-off bearer token. Obtain via your IdP — `ackoctl` has no `login`. |
 | `--workspace ID` | cluster-manager workspace id for ACL scoping. |
 | `-o table\|json\|yaml` | Output format (default `table`). |
-| `--insecure-skip-tls` | Skip TLS verification (dev only). |
+| `--insecure-skip-tls` | Skip TLS verification (dev only). Prints a warning to stderr on every run — see below. |
 | `-v, --verbose` | Verbose logging to stderr. |
 
 Override order: **CLI flag > environment variable > config file**.
 
 Environment overrides: `ACKOCTL_CONFIG`, `ACKOCTL_CONTEXT`, `ACKOCTL_SERVER`, `ACKOCTL_TOKEN`, `ACKOCTL_WORKSPACE`, `ACKOCTL_INSECURE_SKIP_TLS`.
+
+### TLS verification
+
+`config set-context --insecure-skip-tls` persists the setting into the context, so it stays in effect for every later command — including after the context is repointed at a real server, where the bearer token would then travel over an unverified connection. `ackoctl` therefore prints this warning to **stderr** on every run against such a context, whether or not `--verbose` is set:
+
+```
+ackoctl: WARNING — TLS verification is disabled for context "kind-local" (localhost:8000); the bearer token is sent over an unverified connection
+```
+
+The warning goes to stderr, so `-o json` pipelines are unaffected. `ackoctl config view` shows an `INSECURE` column, so you can audit every context at a glance:
+
+```bash
+ackoctl config view
+# CURRENT  NAME        SERVER                      WORKSPACE  INSECURE
+# *        kind-local  http://localhost:8000/api   default    yes (TLS verification skipped)
+#          prod        https://acm.example.com/api
+```
+
+Clear it with `ackoctl config set-context <name> --insecure-skip-tls=false`.
 
 ---
 
@@ -70,11 +89,13 @@ ackoctl cluster info <CONN_ID> -o yaml
 # Tune runtime-mutable namespace knobs (asinfo set-config under the hood).
 # Aerospike CE does NOT support creating namespaces at runtime — they live
 # in aerospike.conf.
-ackoctl cluster configure-namespace <CONN_ID> \
+ackoctl cluster configure-namespace <CONN_ID> --yes \
   --name=test \
   --param=high-water-disk-pct=70 \
   --param=stop-writes-pct=90
 ```
+
+`configure-namespace` applies a `set-config` to a running namespace, so it requires `--yes/-y`. Without it the command refuses and names the resolved context and server host.
 
 ---
 
@@ -173,11 +194,13 @@ ackoctl info <CONN_ID> --command=build --command=status
 # Target a single node
 ackoctl info <CONN_ID> --command=statistics --node=BB9020011AC4202
 
-# Forward a write verb (off the read-only whitelist)
-ackoctl info <CONN_ID> --allow-write --command='set-config:context=service;proto-fd-max=20000'
+# Forward a write verb (off the read-only whitelist) — requires --yes
+ackoctl info <CONN_ID> --allow-write --yes --command='set-config:context=service;proto-fd-max=20000'
 ```
 
 By default, Cluster Manager allows only read-only commands such as `build`, `status`, `statistics`, `namespaces`, and `namespace/<ns>`. `--allow-write` bypasses this list and permits commands such as `set-config:`. The response contains one row for each `(node, command)` pair.
+
+Because `--allow-write` mutates a running cluster's configuration, it also requires `--yes/-y`. Without it the command refuses and names the resolved context and server host, so a wrong-context mistake surfaces before anything is applied. Read-only runs (the default) need no confirmation.
 
 ---
 

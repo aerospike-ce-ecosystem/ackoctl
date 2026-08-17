@@ -105,6 +105,12 @@ type semver struct {
 	major, minor, patch int
 }
 
+// parseSemver extracts major/minor/patch for version *comparison* only. It is
+// deliberately lenient and is NOT a validator: do not use it to decide whether
+// a tag is safe to interpolate into a URL — it discards everything after the
+// first `-`/`+`, so `v1.2.3-<anything>` satisfies it whatever the suffix holds.
+// ValidateTag is the validator, and TestParseSemverIsNotATagValidator pins the
+// difference; these two are not redundant and must not be consolidated.
 func parseSemver(s string) (semver, bool) {
 	s = strings.TrimPrefix(s, "v")
 	// Drop pre-release / build metadata before parsing — we treat

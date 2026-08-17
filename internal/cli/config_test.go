@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -163,4 +164,48 @@ func TestVersionCommand(t *testing.T) {
 	out, _, err := runRoot(t, filepath.Join(t.TempDir(), "x.yaml"), "version", "--short")
 	require.NoError(t, err)
 	assert.Equal(t, "dev\n", out)
+}
+
+// TestConfigViewShowsInsecureColumn pins the INSECURE column. --insecure-skip-tls
+// is persisted by set-context, so before this column the only way to audit which
+// contexts skip certificate verification was to read the YAML by hand.
+func TestConfigViewShowsInsecureColumn(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
+
+	_, _, err := runRoot(t, cfgPath, "config", "set-context", "kind-local",
+		"--server", "http://localhost:8000/api",
+		"--insecure-skip-tls",
+	)
+	require.NoError(t, err)
+	_, _, err = runRoot(t, cfgPath, "config", "set-context", "prod",
+		"--server", "https://acm.example.com/api",
+	)
+	require.NoError(t, err)
+
+	out, _, err := runRoot(t, cfgPath, "config", "view")
+	require.NoError(t, err)
+	assert.Contains(t, out, "INSECURE", "table must carry the INSECURE header")
+
+	// The unsafe context is labelled; the safe one leaves the cell blank so the
+	// column draws the eye instead of filling with "false".
+	lines := strings.Split(out, "\n")
+	var insecureLine, secureLine string
+	for _, l := range lines {
+		switch {
+		case strings.Contains(l, "kind-local"):
+			insecureLine = l
+		case strings.Contains(l, "prod"):
+			secureLine = l
+		}
+	}
+	require.NotEmpty(t, insecureLine, "kind-local row missing from %q", out)
+	require.NotEmpty(t, secureLine, "prod row missing from %q", out)
+	assert.Contains(t, insecureLine, "TLS verification skipped")
+	assert.NotContains(t, secureLine, "TLS verification skipped")
+
+	// -o json already carried the field; verify it is still there and still
+	// redacts the token alongside it.
+	out, _, err = runRoot(t, cfgPath, "config", "view", "-o", "json")
+	require.NoError(t, err)
+	assert.Contains(t, out, `"insecure-skip-tls": true`)
 }

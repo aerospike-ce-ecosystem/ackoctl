@@ -21,6 +21,7 @@ func newInfoCmd(global *GlobalFlags) *cobra.Command {
 		commands   []string
 		node       string
 		allowWrite bool
+		yes        bool
 	)
 	cmd := &cobra.Command{
 		Use:   "info CONN_ID",
@@ -32,9 +33,22 @@ reachable node.
 
 By default the cluster-manager read-only whitelist is enforced (build,
 status, statistics, namespaces, namespace/<ns>, ...); pass --allow-write to
-forward any verb including write-capable ones such as set-config:.`,
+forward any verb including write-capable ones such as set-config:.
+
+--allow-write mutates a running cluster's configuration, so it additionally
+requires --yes/-y. Read-only runs (the default) need no confirmation.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// --allow-write makes cluster-manager skip its read-only verb
+			// whitelist entirely, so any set-config: reaches the live cluster.
+			// That is at least as destructive as the eleven sites that already
+			// gate on --yes, and the gate belongs on impact, not on the verb
+			// spelling. Checked first, as at every other gated site. --yes is
+			// the only affordance — there is no interactive prompt anywhere in
+			// ackoctl, by design, so CI can never hang here.
+			if allowWrite && !yes {
+				return fmt.Errorf("confirmation required (--yes): --allow-write forwards write verbs to %s", mutationTarget(global))
+			}
 			// MarkFlagRequired only checks --command was supplied, not that it
 			// carries a verb. Reject empty/whitespace values so the server is
 			// never hit with a meaningless asinfo request.
@@ -99,7 +113,8 @@ forward any verb including write-capable ones such as set-config:.`,
 	// otherwise be split into pieces by StringSliceVar's comma-splitting.
 	cmd.Flags().StringArrayVar(&commands, "command", nil, "asinfo verb to execute; repeatable (required)")
 	cmd.Flags().StringVar(&node, "node", "", "target a single node by id (e.g. BB9020011AC4202); omit to fan out")
-	cmd.Flags().BoolVar(&allowWrite, "allow-write", false, "bypass the read-only whitelist (allow set-config: and other write verbs)")
+	cmd.Flags().BoolVar(&allowWrite, "allow-write", false, "bypass the read-only whitelist (allow set-config: and other write verbs); requires --yes")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm live-cluster config mutation (required with --allow-write)")
 	_ = cmd.MarkFlagRequired("command")
 	return cmd
 }

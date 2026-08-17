@@ -36,6 +36,7 @@ func TestClusterConfigureNamespaceSendsNameField(t *testing.T) {
 	t.Setenv("ACKOCTL_TOKEN", "test-token")
 	root.SetArgs([]string{
 		"cluster", "configure-namespace", "conn-1",
+		"--yes",
 		"--name", "test",
 		"--param", "stop-writes-pct=90",
 	})
@@ -71,6 +72,7 @@ func TestClusterConfigureNamespacePreservesCommasInParamValue(t *testing.T) {
 	t.Setenv("ACKOCTL_TOKEN", "test-token")
 	root.SetArgs([]string{
 		"cluster", "configure-namespace", "conn-1",
+		"--yes",
 		"--name", "test",
 		"--param", "storage-engine=device,/dev/sda",
 		"--param", "stop-writes-pct=90",
@@ -99,6 +101,7 @@ func TestClusterConfigureNamespaceRejectsReservedParam(t *testing.T) {
 	// --param name=... must be refused — `name` is reserved for --name.
 	root.SetArgs([]string{
 		"cluster", "configure-namespace", "conn-1",
+		"--yes",
 		"--name", "test",
 		"--param", "name=other",
 	})
@@ -124,6 +127,7 @@ func TestClusterConfigureNamespaceRejectsEmptyParamKey(t *testing.T) {
 	// unnamed entry never lands in the request body.
 	root.SetArgs([]string{
 		"cluster", "configure-namespace", "conn-1",
+		"--yes",
 		"--name", "test",
 		"--param", "=90",
 	})
@@ -174,7 +178,7 @@ func TestClusterConfigureNamespaceParamDuplicates(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			t.Setenv("ACKOCTL_SERVER", srv.URL)
 			t.Setenv("ACKOCTL_TOKEN", "test-token")
-			args := []string{"cluster", "configure-namespace", "conn-1", "--name", "test"}
+			args := []string{"cluster", "configure-namespace", "conn-1", "--yes", "--name", "test"}
 			for _, p := range tc.params {
 				args = append(args, "--param", p)
 			}
@@ -211,10 +215,75 @@ func TestClusterConfigureNamespaceRequiresAtLeastOneParam(t *testing.T) {
 	// server cannot act on. The guard must reject it before any HTTP call.
 	root.SetArgs([]string{
 		"cluster", "configure-namespace", "conn-1",
+		"--yes",
 		"--name", "test",
 	})
 	root.SetContext(context.Background())
 	err := root.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "at least one --param")
+}
+
+// TestClusterConfigureNamespaceRequiresYes pins the confirmation gate. This
+// command issues an asinfo set-config against a running namespace — a wrong
+// value can push it into eviction or stop-writes — yet it was the only
+// live-cluster mutation in ackoctl with no --yes requirement.
+func TestClusterConfigureNamespaceRequiresYes(t *testing.T) {
+	tests := []struct {
+		name       string
+		confirm    []string
+		wantErr    string // non-empty => expect this substring and no HTTP call
+		wantCalled bool
+	}{
+		{
+			name:    "no confirmation is refused",
+			wantErr: "confirmation required (--yes)",
+		},
+		{
+			name:       "--yes proceeds",
+			confirm:    []string{"--yes"},
+			wantCalled: true,
+		},
+		{
+			name:       "-y proceeds",
+			confirm:    []string{"-y"},
+			wantCalled: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				called = true
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"message":"ok"}`))
+			}))
+			t.Cleanup(srv.Close)
+
+			root := NewRootCmd()
+			root.SetOut(&bytes.Buffer{})
+			root.SetErr(&bytes.Buffer{})
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv("ACKOCTL_SERVER", srv.URL)
+			t.Setenv("ACKOCTL_TOKEN", "test-token")
+			args := append([]string{"cluster", "configure-namespace", "conn-1"}, tc.confirm...)
+			args = append(args, "--name", "test", "--param", "stop-writes-pct=90")
+			root.SetArgs(args)
+			root.SetContext(context.Background())
+			err := root.Execute()
+
+			if tc.wantErr != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.wantErr)
+				// The refusal names the environment, so an operator pointed at
+				// the wrong context sees it before anything is applied.
+				assert.Contains(t, err.Error(), "127.0.0.1")
+				assert.False(t, called, "gate must refuse before any HTTP call")
+				return
+			}
+			require.NoError(t, err)
+			assert.True(t, called, "confirmed run must reach the server")
+		})
+	}
 }

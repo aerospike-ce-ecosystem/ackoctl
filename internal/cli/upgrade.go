@@ -112,11 +112,17 @@ to a path you own (e.g. ~/.local/bin).`,
 // normalizeUpgradeTag canonicalises the raw --version flag value into a
 // release tag suitable for the GitHub URL. It returns the normalised tag, a
 // "resolve latest" signal for the caller (true when the user did not pass
-// --version at all), and an error when the user passed only whitespace.
+// --version at all), and an error when the value is not a semver tag.
 //
 // Without the TrimSpace guard a value like " " would survive the empty
 // check, then raw[0] would be a space, the v-prefix branch would produce
 // "v " and the resulting GitHub URL would 404 with a confusing error.
+//
+// The release.ValidateTag call is the security-relevant part: the tag is
+// interpolated into both the asset URL and the checksums.txt URL, so anything
+// that can reshape the path can point the download and its checksum file at
+// the same attacker-chosen location and still pass verification. Rejecting
+// here means no unvalidated tag ever reaches a URL builder.
 func normalizeUpgradeTag(raw string) (tag string, resolveLatest bool, err error) {
 	if raw == "" {
 		return "", true, nil
@@ -127,6 +133,9 @@ func normalizeUpgradeTag(raw string) (tag string, resolveLatest bool, err error)
 	}
 	if trimmed[0] != 'v' {
 		trimmed = "v" + trimmed
+	}
+	if err := release.ValidateTag(trimmed); err != nil {
+		return "", false, fmt.Errorf("--version: %w", err)
 	}
 	return trimmed, false, nil
 }

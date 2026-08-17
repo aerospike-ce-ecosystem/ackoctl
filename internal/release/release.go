@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -27,6 +28,31 @@ const (
 	// distinguish self-update traffic from generic curl.
 	userAgent = "ackoctl-release-client"
 )
+
+// tagPattern is the only shape allowed to reach a release URL. Every tag we
+// build a URL from is interpolated straight into the path, and Go transmits
+// path segments — including `..` — verbatim, so an unvalidated tag can steer
+// both AssetURL and ChecksumsURL at a different repository's release assets.
+// Because checksums.txt is fetched from the same tag-derived location, the
+// sha256 check would then verify the substituted archive against its own
+// checksum file and pass. Anchored, digits-only version fields with an
+// optional pre-release / build-metadata suffix leaves no room for a separator
+// (`/`), a dot-dot segment, or percent-encoding.
+var tagPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$`)
+
+// ValidateTag rejects a release tag that is not a plain semver tag with a
+// leading `v`. Call it before interpolating a tag into any URL — parseSemver
+// is not a substitute: it discards everything after the first `-`/`+` before
+// parsing, so `v1.2.3-<anything>` satisfies it whatever the suffix contains.
+func ValidateTag(tag string) error {
+	if tag == "" {
+		return fmt.Errorf("release tag must not be empty")
+	}
+	if !tagPattern.MatchString(tag) {
+		return fmt.Errorf("invalid release tag %q: want a semver tag such as v0.1.0, v1.2.3-rc1, or v1.2.3+build.5", tag)
+	}
+	return nil
+}
 
 // HTTPClient is the minimum surface we need from net/http.Client. Defined
 // as an interface so tests can plug in a recorder without spinning up a
@@ -89,8 +115,11 @@ func (c *Client) LatestTag(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("resolve latest tag: cannot parse tag from %q", loc)
 	}
 	tag := loc[idx+1:]
-	if !strings.HasPrefix(tag, "v") {
-		return "", fmt.Errorf("resolve latest tag: %q does not look like a semver tag", tag)
+	// Defense in depth: the Location header is the other source of tags that
+	// feed AssetURL / ChecksumsURL, so hold it to the same shape as a
+	// user-supplied --version rather than the old leading-`v` check.
+	if err := ValidateTag(tag); err != nil {
+		return "", fmt.Errorf("resolve latest tag: %w", err)
 	}
 	return tag, nil
 }

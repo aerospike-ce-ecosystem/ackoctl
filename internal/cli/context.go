@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/spf13/cobra"
 
@@ -52,9 +53,17 @@ func newClient(cmd *cobra.Command, global *GlobalFlags) (*client.BaseClient, err
 	c := client.New(ctx)
 	if global.Verbose {
 		c.VerboseLogger = cmd.ErrOrStderr()
-		if c.HTTPClient != nil && ctx.InsecureSkipTLS {
-			fmt.Fprintln(c.VerboseLogger, "ackoctl: WARNING — TLS verification is disabled")
-		}
+	}
+	// Unconditional, not gated on --verbose: `config set-context
+	// --insecure-skip-tls` persists the setting, so an operator who enabled it
+	// once for kind keeps sending the bearer token over an unverified
+	// connection after the context is repointed at a real server. The warning
+	// only earns its keep if it fires on every such run. It goes to stderr so
+	// `-o json | jq` pipelines stay parseable.
+	if ctx.InsecureSkipTLS {
+		fmt.Fprintf(cmd.ErrOrStderr(),
+			"ackoctl: WARNING — TLS verification is disabled for %s; the bearer token is sent over an unverified connection\n",
+			describeTarget(ctx))
 	}
 	// Surface workspace fallback so users notice when an ACL is silently
 	// scoping their request to the current context's workspace.
@@ -62,6 +71,36 @@ func newClient(cmd *cobra.Command, global *GlobalFlags) (*client.BaseClient, err
 		warnWorkspaceFallback(cmd.ErrOrStderr(), global.Verbose, ctx.WorkspaceID)
 	}
 	return c, nil
+}
+
+// describeTarget renders a resolved Context as "context "prod" (acm.example.com)"
+// for warnings and confirmation refusals, so the operator can tell which
+// environment a command was about to touch. The Name is empty when the server
+// came only from --server / $ACKOCTL_SERVER with no context on disk, so the
+// host alone is reported in that case. Only the host is shown — the path and
+// query would add noise, and the token is never part of the URL.
+func describeTarget(ctx config.Context) string {
+	host := ctx.Server
+	if u, err := url.Parse(ctx.Server); err == nil && u.Host != "" {
+		host = u.Host
+	}
+	if ctx.Name == "" {
+		return fmt.Sprintf("server %s", host)
+	}
+	return fmt.Sprintf("context %q (%s)", ctx.Name, host)
+}
+
+// mutationTarget is describeTarget for callers that have only the flags — the
+// confirmation gates, which must name the target environment *before* a client
+// is built. Resolution errors degrade to a placeholder rather than replacing
+// the missing-confirmation error with a config error: the user's actual mistake
+// is the absent --yes, and a broken context surfaces on the next attempt.
+func mutationTarget(global *GlobalFlags) string {
+	ctx, err := resolveContext(global)
+	if err != nil {
+		return "an unresolved target (see `ackoctl config view`)"
+	}
+	return describeTarget(ctx)
 }
 
 func warnWorkspaceFallback(w io.Writer, verbose bool, ws string) {

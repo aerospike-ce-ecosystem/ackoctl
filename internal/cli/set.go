@@ -69,7 +69,7 @@ Destructive: requires --yes/-y to proceed.`,
 				v := beforeLut
 				lutPtr = &v
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -90,7 +90,7 @@ Destructive: requires --yes/-y to proceed.`,
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive truncate")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newSetListCmd(global *GlobalFlags) *cobra.Command {
@@ -100,7 +100,7 @@ func newSetListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List sets across (or within) namespaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -139,7 +139,7 @@ func newSetListCmd(global *GlobalFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&namespace, "namespace", "", "filter to a single namespace")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // extractSets walks the raw cluster-info map. Each silently-skipped element

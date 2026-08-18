@@ -19,7 +19,7 @@ docs/                usage, install, and the manual e2e-kind scenario
 - **Command grammar**: `ackoctl <noun> <verb>` (gh/aws style). Example: `ackoctl connection list`, not `ackoctl get connections`.
 - **Output**: default `table`, opt-in `-o json` / `-o yaml`. Always supply machine-readable output for any list/get command.
 - **Errors**: parse cluster-manager FastAPI `{"detail": ...}` and surface via `APIError`. Exit code 1 on failure.
-- **Workspace ACL**: every resource command honors `--workspace`; default comes from current context. Never silently fall back to "first workspace".
+- **Workspace scoping**: `--workspace` is persistent, but cluster-manager accepts a client-supplied workspace in only three places — the `workspace_id` filter on `GET /connections`, the `workspaceId` body field on connection create/update, and the `/guides/{workspace_id}` path. `GET /k8s/clusters` takes it indirectly, as a `labelSelector` over the `acm.aerospike.com/workspace` CR label. Every other endpoint derives the workspace from the connection profile named in the path and checks it against the caller's identity. So each runnable command must declare its handling with `wsScopedCmd`, `wsGuardedCmd`, or `wsUnsupportedCmd` (`internal/cli/workspace.go`); the declaration is enforced default-deny in the root `PersistentPreRunE`, so a command that declares nothing rejects the flag instead of ignoring it. Default comes from current context. Never silently fall back to "first workspace".
 - **Auth**: bearer token only. No interactive `ackoctl login` — users bring their own OIDC JWT.
 
 ## Adding a new endpoint
@@ -27,7 +27,7 @@ docs/                usage, install, and the manual e2e-kind scenario
 1. Confirm shape against `/api/openapi.json` from a running cluster-manager (kind + `kubectl port-forward`).
 2. Add request/response types to `internal/client/types.go` (mirror Pydantic models but only fields ackoctl uses).
 3. Add a method on `BaseClient` in the matching `internal/client/<noun>s.go` file.
-4. Add the cobra command in `internal/cli/<noun>.go`.
+4. Add the cobra command in `internal/cli/<noun>.go`, wrapping it in the `wsScopedCmd` / `wsGuardedCmd` / `wsUnsupportedCmd` that matches what the endpoint does with a workspace. `TestEveryCommandDeclaresWorkspaceHandling` fails until you pick one.
 5. Add an httptest round-trip test in `internal/client/<noun>s_test.go` and a cobra-level test in `internal/cli/<noun>_test.go`, mirroring the existing noun tests.
 
 ## Test layers

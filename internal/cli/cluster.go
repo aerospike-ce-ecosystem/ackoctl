@@ -24,12 +24,12 @@ func newClusterCmd(global *GlobalFlags) *cobra.Command {
 }
 
 func newClusterInfoCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "info CONN_ID",
 		Short: "Show cluster nodes, namespaces, and sets",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -50,6 +50,7 @@ func newClusterInfoCmd(global *GlobalFlags) *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), format, info)
 		},
 	}
+	return wsGuardedCmd(cmd)
 }
 
 func newClusterConfigureNamespaceCmd(global *GlobalFlags) *cobra.Command {
@@ -124,7 +125,7 @@ For knobs outside those two, use the asinfo passthrough:
 					"ackoctl: WARNING — %s. A cluster-manager without the fix in %s will apply its own default to namespace %q on the running cluster\n",
 					strings.Join(omitted, "; "), clusterManagerOmittedParamFixURL, nsName)
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -148,7 +149,7 @@ For knobs outside those two, use the asinfo passthrough:
 		"config knob as key=value; only memorySize=<bytes> and replicationFactor=<1-8> are read by the server (repeatable)")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm live-namespace config mutation")
 	_ = cmd.MarkFlagRequired("name")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // clusterManagerOmittedParamFixURL points at the paired cluster-manager change

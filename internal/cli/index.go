@@ -23,12 +23,12 @@ func newIndexCmd(global *GlobalFlags) *cobra.Command {
 }
 
 func newIndexListCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list CONN_ID",
 		Short: "List secondary indexes across all namespaces",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -58,6 +58,7 @@ func newIndexListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsGuardedCmd(cmd)
 }
 
 func newIndexCreateCmd(global *GlobalFlags) *cobra.Command {
@@ -72,7 +73,7 @@ func newIndexCreateCmd(global *GlobalFlags) *cobra.Command {
 			if err := validateIndexType(idxType); err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -103,7 +104,7 @@ func newIndexCreateCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("bin")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("type")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newIndexDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -119,7 +120,7 @@ func newIndexDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -135,5 +136,5 @@ func newIndexDeleteCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("name")
-	return cmd
+	return wsGuardedCmd(cmd)
 }

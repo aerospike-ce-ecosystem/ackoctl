@@ -10,7 +10,7 @@
 | `--context NAME` | Use a specific context instead of `current-context`. |
 | `--server URL` | One-off server override (e.g. `http://localhost:8000/api`). |
 | `--token TOKEN` | One-off bearer token. Obtain via your IdP — `ackoctl` has no `login`. |
-| `--workspace ID` | cluster-manager workspace id for ACL scoping. |
+| `--workspace ID` | Scope the command to a workspace. Rejected by commands that cannot honor it — see [Workspace scoping](#workspace-scoping). |
 | `-o table\|json\|yaml` | Output format (default `table`). |
 | `--insecure-skip-tls` | Skip TLS verification (dev only). Prints a warning to stderr on every run — see below. |
 | `-v, --verbose` | Verbose logging to stderr. |
@@ -18,6 +18,48 @@
 Override order: **CLI flag > environment variable > config file**.
 
 Environment overrides: `ACKOCTL_CONFIG`, `ACKOCTL_CONTEXT`, `ACKOCTL_SERVER`, `ACKOCTL_TOKEN`, `ACKOCTL_WORKSPACE`, `ACKOCTL_INSECURE_SKIP_TLS`.
+
+### Workspace scoping
+
+`--workspace` means different things to different commands, because Cluster Manager accepts a workspace on only a few endpoints. Every command falls into one of three groups, and no command accepts the flag and ignores it.
+
+**Scoped server-side.** Cluster Manager does the filtering:
+
+| Command | How the workspace is sent |
+|---------|---------------------------|
+| `connection list` | `workspace_id` query filter |
+| `connection create` | `workspaceId` on the new profile |
+| `guide list`, `guide get` | `/guides/{workspace_id}` path |
+| `k8s cluster list` | `labelSelector` over the `acm.aerospike.com/workspace` CR label |
+
+Because `k8s cluster list` selects on the CR label, clusters carrying no workspace label are left out of a filtered listing — Cluster Manager treats those as shared rather than as members of any workspace.
+
+**Checked before the command runs.** Every command that takes a `CONN_ID` (or a connection `ID`) — `record`, `set`, `query`, `index`, `udf`, `note`, `admin`, `cluster`, `info`, and `connection get|update|delete|health`. Those endpoints have no workspace parameter: Cluster Manager reads the workspace off the stored connection profile. `ackoctl` therefore resolves the profile first and refuses when it belongs to a different workspace:
+
+```console
+$ ackoctl record delete c-prod --namespace=test --set=users --pk=alice --yes --workspace=ws-team-a
+Error: connection "c-prod" is in workspace "ws-team-b", not "ws-team-a" (from --workspace): refusing to run "ackoctl record delete" against it
+```
+
+The extra lookup is `GET /connections/{id}`, which runs the same access check as the operation itself, so it can never reveal a connection the command would have refused. A profile that reports no workspace at all is shared server-side; those commands proceed and say so on stderr rather than failing.
+
+**Rejected.** `version`, `upgrade`, `completion`, and every `config` subcommand never contact Cluster Manager. `k8s cluster get|pods|logs|events|reconcile|scale` do, but Cluster Manager returns no workspace for a single cluster, so `ackoctl` has nothing to check against. All of them refuse the flag rather than dropping it:
+
+```console
+$ ackoctl config view --workspace=ws-team-a
+Error: --workspace is not supported by "ackoctl config view": it does not contact cluster-manager
+
+Commands that honour --workspace:
+  ackoctl connection list|create        cluster-manager filters/assigns by workspace
+  ackoctl guide list|get                guides are addressed by workspace
+  ackoctl k8s cluster list              filters CRs by their acm.aerospike.com/workspace label
+  ackoctl <noun> <verb> CONN_ID ...     refuses when CONN_ID is in another workspace
+
+To give a context a default workspace instead:
+  ackoctl config set-context NAME --workspace-id ID
+```
+
+`$ACKOCTL_WORKSPACE` and a context's `workspace-id` are ambient configuration, not a per-command request, so they are ignored by these commands instead of failing them. Only an explicit `--workspace` is rejected.
 
 ### TLS verification
 

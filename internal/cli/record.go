@@ -44,7 +44,7 @@ func newRecordListCmd(global *GlobalFlags) *cobra.Command {
 			if pageSize < 1 || pageSize > 500 {
 				return fmt.Errorf("--page-size must be between 1 and 500, got %d", pageSize)
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -78,7 +78,7 @@ func newRecordListCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&set, "set", "", "set name; empty matches the namespace-default set")
 	cmd.Flags().IntVar(&pageSize, "page-size", 25, "max records to return (1-500)")
 	_ = cmd.MarkFlagRequired("namespace")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newRecordGetCmd(global *GlobalFlags) *cobra.Command {
@@ -93,7 +93,7 @@ func newRecordGetCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -115,7 +115,7 @@ func newRecordGetCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
@@ -154,7 +154,7 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 				v := ttl
 				req.TTL = &v
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -179,7 +179,7 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
 	_ = cmd.MarkFlagRequired("bins")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -198,7 +198,7 @@ func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -217,7 +217,7 @@ func newRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newRecordDeleteBinCmd(global *GlobalFlags) *cobra.Command {
@@ -239,7 +239,7 @@ record to disappear server-side — this is standard Aerospike behaviour.`,
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -260,7 +260,7 @@ record to disappear server-side — this is standard Aerospike behaviour.`,
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
 	_ = cmd.MarkFlagRequired("bin")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
@@ -325,7 +325,7 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 				}
 				req.Predicate = m
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -352,5 +352,5 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&filterJSON, "filter", "", "filter group as JSON (cluster-manager FilterGroup shape)")
 	cmd.Flags().StringVar(&predicateJSON, "predicate", "", "predicate as JSON (cluster-manager QueryPredicate shape)")
 	_ = cmd.MarkFlagRequired("namespace")
-	return cmd
+	return wsGuardedCmd(cmd)
 }

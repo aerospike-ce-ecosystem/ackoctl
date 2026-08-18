@@ -105,7 +105,7 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 				req.Predicate = pred
 			}
 
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 	cmd.Flags().StringVar(&primaryKey, "primary-key", "", "primary key for direct lookup")
 	cmd.Flags().StringVar(&pkType, "pk-type", "", "particle type for primary key: auto|string|int|bytes")
 	_ = cmd.MarkFlagRequired("namespace")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // parseJSONScalar accepts either a JSON literal (`"foo"`, `30`, `true`,

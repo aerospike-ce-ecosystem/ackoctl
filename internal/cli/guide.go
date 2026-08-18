@@ -64,7 +64,7 @@ func guideWorkspace(cmd *cobra.Command, c *client.BaseClient) string {
 }
 
 func newGuideListCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the operational guides registered for the workspace",
 		Args:  cobra.NoArgs,
@@ -99,10 +99,11 @@ func newGuideListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsScopedCmd(cmd)
 }
 
 func newGuideGetCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "get GUIDE_TYPE",
 		Short: "Read one operational guide (data-plane or control-plane)",
 		Long: `Print an operational guide.
@@ -150,4 +151,5 @@ GUIDE_TYPE must be one of: data-plane, control-plane.`,
 			return output.Print(cmd.OutOrStdout(), format, guide)
 		},
 	}
+	return wsScopedCmd(cmd)
 }

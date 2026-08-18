@@ -253,7 +253,7 @@ func TestK8sListAndReconcile(t *testing.T) {
 		}
 	})
 
-	list, err := c.ListK8sClusters(context.Background())
+	list, err := c.ListK8sClusters(context.Background(), "")
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "Completed", list[0]["phase"])

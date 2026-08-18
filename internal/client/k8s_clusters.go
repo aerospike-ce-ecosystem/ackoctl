@@ -7,13 +7,32 @@ import (
 	"strconv"
 )
 
-func (c *BaseClient) ListK8sClusters(ctx context.Context) ([]K8sCluster, error) {
+// ListK8sClusters lists ACKO-managed AerospikeCluster CRs, restricted to
+// workspaceID when it is non-empty.
+//
+// GET /k8s/clusters has no workspace parameter — cluster-manager reads the
+// workspace off each CR's metadata label and filters by visibility. It does
+// forward labelSelector to the Kubernetes API unchanged, though, so selecting
+// on that same label is how a workspace filter reaches the server. Selecting
+// on the label also excludes CRs carrying no workspace label at all, which is
+// correct: cluster-manager treats those as shared, not as members of the
+// requested workspace.
+func (c *BaseClient) ListK8sClusters(ctx context.Context, workspaceID string) ([]K8sCluster, error) {
+	q := url.Values{}
+	if workspaceID != "" {
+		q.Set("labelSelector", K8sWorkspaceLabel+"="+workspaceID)
+	}
 	var out K8sClusterListResponse
-	if err := c.Do(ctx, http.MethodGet, "/k8s/clusters", nil, nil, &out); err != nil {
+	if err := c.Do(ctx, http.MethodGet, "/k8s/clusters", nil, q, &out); err != nil {
 		return nil, err
 	}
 	return out.Items, nil
 }
+
+// K8sWorkspaceLabel is the AerospikeCluster CR metadata label cluster-manager
+// stamps the owning workspace onto (_WORKSPACE_LABEL in
+// routers/k8s_clusters.py).
+const K8sWorkspaceLabel = "acm.aerospike.com/workspace"
 
 func (c *BaseClient) GetK8sCluster(ctx context.Context, namespace, name string) (K8sCluster, error) {
 	out := K8sCluster{}

@@ -80,7 +80,7 @@ func insecureCell(skip bool) string {
 }
 
 func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "view",
 		Short: "Show merged ackoctl config",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -127,6 +127,7 @@ func newConfigViewCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }
 
 func newConfigSetContextCmd(global *GlobalFlags) *cobra.Command {
@@ -189,11 +190,11 @@ func newConfigSetContextCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&token, "token", "", "bearer token (obtain via your IdP)")
 	cmd.Flags().StringVar(&workspaceID, "workspace-id", "", "default workspace id for this context")
 	cmd.Flags().BoolVar(&insecure, "insecure-skip-tls", false, "skip TLS certificate verification for this context")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonSetContext)
 }
 
 func newConfigUseContextCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "use-context NAME",
 		Short: "Set the current context",
 		Args:  cobra.ExactArgs(1),
@@ -216,10 +217,11 @@ func newConfigUseContextCmd(global *GlobalFlags) *cobra.Command {
 			return nil
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }
 
 func newConfigCurrentContextCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "current-context",
 		Short: "Print the current context name",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -238,10 +240,11 @@ func newConfigCurrentContextCmd(global *GlobalFlags) *cobra.Command {
 			return nil
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }
 
 func newConfigDeleteContextCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "delete-context NAME",
 		Short: "Remove a context",
 		Args:  cobra.ExactArgs(1),
@@ -264,4 +267,5 @@ func newConfigDeleteContextCmd(global *GlobalFlags) *cobra.Command {
 			return nil
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }

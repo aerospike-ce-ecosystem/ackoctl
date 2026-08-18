@@ -57,7 +57,7 @@ func newAdminUserListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List Aerospike users",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -93,7 +93,7 @@ func newAdminUserListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
@@ -111,7 +111,7 @@ func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -140,7 +140,7 @@ func newAdminUserCreateCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("username")
 	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
 	cmd.MarkFlagsOneRequired("password", "password-stdin")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newAdminUserPasswdCmd(global *GlobalFlags) *cobra.Command {
@@ -160,7 +160,7 @@ password-only.`,
 			if err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -184,7 +184,7 @@ password-only.`,
 	_ = cmd.MarkFlagRequired("username")
 	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
 	cmd.MarkFlagsOneRequired("password", "password-stdin")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newAdminUserDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -200,7 +200,7 @@ func newAdminUserDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -214,7 +214,7 @@ func newAdminUserDeleteCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&username, "username", "", "username (required)")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("username")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ func newAdminRoleListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List Aerospike roles",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -276,7 +276,7 @@ func newAdminRoleListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newAdminRoleCreateCmd(global *GlobalFlags) *cobra.Command {
@@ -322,7 +322,7 @@ privileges to one role.`,
 				v := writeQuota
 				req.WriteQuota = &v
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -344,7 +344,7 @@ privileges to one role.`,
 	cmd.Flags().IntVar(&writeQuota, "write-quota", 0, "write TPS quota (optional)")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("privilege")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newAdminRoleDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -360,7 +360,7 @@ func newAdminRoleDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -374,7 +374,7 @@ func newAdminRoleDeleteCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "role name (required)")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("name")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // ---------------------------------------------------------------------------

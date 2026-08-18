@@ -59,7 +59,7 @@ requires --yes/-y. Read-only runs (the default) need no confirmation.`,
 					return fmt.Errorf("--command must not be empty")
 				}
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -118,5 +118,5 @@ requires --yes/-y. Read-only runs (the default) need no confirmation.`,
 	cmd.Flags().BoolVar(&allowWrite, "allow-write", false, "bypass the read-only whitelist (allow set-config: and other write verbs); requires --yes")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm live-cluster config mutation (required with --allow-write)")
 	_ = cmd.MarkFlagRequired("command")
-	return cmd
+	return wsGuardedCmd(cmd)
 }

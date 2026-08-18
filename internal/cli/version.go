@@ -39,5 +39,5 @@ func newVersionCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&short, "short", false, "print only the version string")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }

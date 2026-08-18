@@ -48,15 +48,20 @@ func newK8sClusterCmd(global *GlobalFlags) *cobra.Command {
 }
 
 func newK8sClusterListCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List ACKO-managed clusters",
+		Long: `Lists the AerospikeCluster CRs cluster-manager can see.
+
+With --workspace (or a context workspace-id) the listing is restricted to CRs
+labelled for that workspace. Clusters carrying no workspace label are shared
+rather than owned by any workspace, so they are left out of a filtered list.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			c, err := newClient(cmd, global)
 			if err != nil {
 				return err
 			}
-			items, err := c.ListK8sClusters(cmd.Context())
+			items, err := c.ListK8sClusters(cmd.Context(), c.Workspace)
 			if err != nil {
 				return err
 			}
@@ -87,10 +92,11 @@ func newK8sClusterListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsScopedCmd(cmd)
 }
 
 func newK8sClusterGetCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "get NAMESPACE/NAME",
 		Short: "Get a single ACKO-managed cluster",
 		Args:  cobra.ExactArgs(1),
@@ -114,10 +120,11 @@ func newK8sClusterGetCmd(global *GlobalFlags) *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), format, cluster)
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 func newK8sClusterReconcileCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "reconcile NAMESPACE/NAME",
 		Short: "Force the ACKO operator to re-reconcile this cluster",
 		Long: `Adds the acko.io/force-reconcile annotation to the AerospikeCluster CR.
@@ -143,6 +150,7 @@ Useful when the cluster is stuck in a drifted state.`,
 			return output.Print(cmd.OutOrStdout(), format, out)
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 func newK8sClusterScaleCmd(global *GlobalFlags) *cobra.Command {
@@ -218,7 +226,7 @@ the cluster ejects nodes and can lose data on unreplicated partitions.`,
 	cmd.Flags().IntVar(&size, "size", 1, "target node count (1..8, CE cap)")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm scale-down (required when target < current size)")
 	_ = cmd.MarkFlagRequired("size")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 // intField extracts an integer from a map[string]any returned by the API.
@@ -311,7 +319,7 @@ Note: --since is applied client-side after fetching; the REST endpoint has no
 	cmd.Flags().IntVar(&limit, "limit", 50, "max events to return (1-500)")
 	cmd.Flags().StringVar(&category, "category", "", "filter by event category (e.g. Scaling, Lifecycle, Monitoring, Network, Template, Circuit Breaker, Other)")
 	cmd.Flags().DurationVar(&since, "since", 0, "only show events with lastTimestamp newer than this duration (e.g. 15m, 1h). Applied client-side after fetch — REST has no 'since' param")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 // filterEventsSince keeps events whose effective timestamp is at or after
@@ -419,7 +427,7 @@ envelope. Streaming (--follow) is not supported.`,
 	cmd.Flags().IntVar(&tail, "tail", 500, "number of tail lines to return (1..10000)")
 	cmd.Flags().DurationVar(&since, "since", 0, "only return logs newer than this duration (e.g. 30m, 1h; max 24h)")
 	_ = cmd.MarkFlagRequired("pod")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 // sinceFlagToSeconds converts a --since duration into the integer seconds the
@@ -443,7 +451,7 @@ func sinceFlagToSeconds(d time.Duration) (int, error) {
 // K8sPodStatus envelope including configHash/podSpecHash/accessEndpoints so
 // upgrade-tracking scripts and dashboards can consume the entire shape.
 func newK8sClusterPodsCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "pods NAMESPACE/NAME",
 		Short: "List pod status for an ACKO-managed cluster",
 		Long: `Fetches per-pod status for the AerospikeCluster CR via
@@ -494,6 +502,7 @@ most useful during triage; -o json or -o yaml emits the full payload
 			)
 		},
 	}
+	return wsUnsupportedCmd(cmd, reasonNoK8sWorkspace)
 }
 
 // rackIDField renders an optional rack id for the table view. Nil prints as

@@ -106,7 +106,7 @@ to a path you own (e.g. ~/.local/bin).`,
 	}
 	cmd.Flags().StringVar(&targetVersion, "version", "", "pin a specific release (e.g. v0.1.0); defaults to the latest tag")
 	cmd.Flags().BoolVar(&check, "check", false, "only report current vs latest; do not download or replace")
-	return cmd
+	return wsUnsupportedCmd(cmd, reasonNoServer)
 }
 
 // normalizeUpgradeTag canonicalises the raw --version flag value into a

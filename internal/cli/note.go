@@ -65,7 +65,7 @@ func newNoteSetUpdateCmd(global *GlobalFlags) *cobra.Command {
 			if note == "" {
 				return fmt.Errorf("--note must not be empty")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -86,7 +86,7 @@ func newNoteSetUpdateCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("note")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newNoteSetDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -102,7 +102,7 @@ func newNoteSetDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("confirmation required (--yes)")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -118,7 +118,7 @@ func newNoteSetDeleteCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newNoteSetListCmd(global *GlobalFlags) *cobra.Command {
@@ -128,7 +128,7 @@ func newNoteSetListCmd(global *GlobalFlags) *cobra.Command {
 		Short: "List set-level notes for a connection",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -159,7 +159,7 @@ func newNoteSetListCmd(global *GlobalFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&namespace, "namespace", "", "filter to a single namespace (optional)")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ func newNoteRecordUpdateCmd(global *GlobalFlags) *cobra.Command {
 			if note == "" {
 				return fmt.Errorf("--note must not be empty")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -222,7 +222,7 @@ func newNoteRecordUpdateCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
 	_ = cmd.MarkFlagRequired("note")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -241,7 +241,7 @@ func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if err := validatePKType(pkType); err != nil {
 				return err
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -260,7 +260,7 @@ func newNoteRecordDeleteCmd(global *GlobalFlags) *cobra.Command {
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
 	_ = cmd.MarkFlagRequired("pk")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newNoteRecordListCmd(global *GlobalFlags) *cobra.Command {
@@ -274,7 +274,7 @@ func newNoteRecordListCmd(global *GlobalFlags) *cobra.Command {
 scan does not surface — it returns every annotated record key for the slice.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -308,7 +308,7 @@ scan does not surface — it returns every annotated record key for the slice.`,
 	cmd.Flags().StringVar(&set, "set", "", "set name (required)")
 	_ = cmd.MarkFlagRequired("namespace")
 	_ = cmd.MarkFlagRequired("set")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 // sanitizeCell flattens a free-text value into a single tabwriter-safe line.

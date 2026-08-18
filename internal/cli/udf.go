@@ -36,12 +36,12 @@ Only Lua modules are supported in Aerospike CE.`,
 }
 
 func newUdfListCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list CONN_ID",
 		Short: "List registered UDF modules on a cluster",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -71,6 +71,7 @@ func newUdfListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsGuardedCmd(cmd)
 }
 
 func newUdfUploadCmd(global *GlobalFlags) *cobra.Command {
@@ -111,7 +112,7 @@ as the registered module name. cluster-manager validates the filename against
 			if effective == "" {
 				effective = filepath.Base(filePath)
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -141,7 +142,7 @@ as the registered module name. cluster-manager validates the filename against
 	cmd.Flags().StringVar(&filePath, "file", "", "path to a local .lua source file (required)")
 	cmd.Flags().StringVar(&filename, "filename", "", "override the registered module name (default: basename of --file)")
 	_ = cmd.MarkFlagRequired("file")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newUdfRemoveCmd(global *GlobalFlags) *cobra.Command {
@@ -164,7 +165,7 @@ func newUdfRemoveCmd(global *GlobalFlags) *cobra.Command {
 			if filename == "" {
 				return fmt.Errorf("--filename must not be empty")
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -178,5 +179,5 @@ func newUdfRemoveCmd(global *GlobalFlags) *cobra.Command {
 	cmd.Flags().StringVar(&filename, "filename", "", "registered module name to remove (required)")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive remove")
 	_ = cmd.MarkFlagRequired("filename")
-	return cmd
+	return wsGuardedCmd(cmd)
 }

@@ -65,6 +65,14 @@ go through cluster-manager's /api/* surface.`,
 			if _, err := output.Parse(flags.OutputFormat); err != nil {
 				return err
 			}
+			// Reject --workspace on commands that cannot honour it, for the
+			// same reason and in the same place as the -o check above: the
+			// flag is persistent, so refusing it here is the only spot that
+			// covers every command at once, and refusing before RunE means a
+			// misscoped mutation never reaches the server.
+			if err := checkWorkspaceSupported(c); err != nil {
+				return err
+			}
 			runVersionCheck(c, flags.NoVersionCheck)
 			return nil
 		},
@@ -74,7 +82,7 @@ go through cluster-manager's /api/* surface.`,
 	cmd.PersistentFlags().StringVar(&flags.Context, "context", "", "context name to use (overrides current-context)")
 	cmd.PersistentFlags().StringVar(&flags.Server, "server", "", "cluster-manager API base URL (overrides context)")
 	cmd.PersistentFlags().StringVar(&flags.Token, "token", "", "bearer token for cluster-manager (overrides context)")
-	cmd.PersistentFlags().StringVar(&flags.WorkspaceID, "workspace", "", "cluster-manager workspace id for ACL scoping")
+	cmd.PersistentFlags().StringVar(&flags.WorkspaceID, "workspace", "", "cluster-manager workspace id to scope this command to; rejected by commands that cannot honor it")
 	cmd.PersistentFlags().StringVarP(&flags.OutputFormat, "output", "o", "table", "output format: table|json|yaml")
 	cmd.PersistentFlags().BoolVarP(&flags.Verbose, "verbose", "v", false, "verbose logging to stderr")
 	cmd.PersistentFlags().BoolVar(&flags.InsecureSkipTLS, "insecure-skip-tls", false, "skip TLS certificate verification (dev only)")
@@ -104,8 +112,24 @@ go through cluster-manager's /api/* surface.`,
 	// to source completions from their ~/.zshrc.
 	cmd.InitDefaultCompletionCmd()
 	augmentZshCompletionHelp(cmd)
+	markCompletionWorkspaceUnsupported(cmd)
 
 	return cmd
+}
+
+// markCompletionWorkspaceUnsupported annotates cobra's generated `completion`
+// subcommands. They are built by InitDefaultCompletionCmd rather than by us,
+// so they would otherwise reach the default-deny branch with no reason to
+// show the user.
+func markCompletionWorkspaceUnsupported(root *cobra.Command) {
+	comp, _, err := root.Find([]string{"completion"})
+	if err != nil || comp == nil {
+		return
+	}
+	wsUnsupportedCmd(comp, reasonNoServer)
+	for _, sub := range comp.Commands() {
+		wsUnsupportedCmd(sub, reasonNoServer)
+	}
 }
 
 // augmentZshCompletionHelp appends the simpler "source from ~/.zshrc" persistent

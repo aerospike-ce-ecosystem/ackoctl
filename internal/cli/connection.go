@@ -27,7 +27,7 @@ func newConnectionCmd(global *GlobalFlags) *cobra.Command {
 }
 
 func newConnectionListCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List connection profiles",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -61,10 +61,11 @@ func newConnectionListCmd(global *GlobalFlags) *cobra.Command {
 			)
 		},
 	}
+	return wsScopedCmd(cmd)
 }
 
 func newConnectionGetCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "get ID",
 		Short: "Get a connection profile",
 		Args:  cobra.ExactArgs(1),
@@ -77,6 +78,14 @@ func newConnectionGetCmd(global *GlobalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// This command already holds the profile newConnClient would have
+			// fetched, so it enforces --workspace against that response rather
+			// than paying a second GET for the same row.
+			if c.Workspace != "" {
+				if err := checkConnWorkspace(cmd, global, args[0], c.Workspace, conn.WorkspaceID); err != nil {
+					return err
+				}
+			}
 			format, err := global.Format()
 			if err != nil {
 				return err
@@ -84,6 +93,7 @@ func newConnectionGetCmd(global *GlobalFlags) *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), format, conn)
 		},
 	}
+	return wsGuardedCmd(cmd)
 }
 
 func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
@@ -174,7 +184,7 @@ func newConnectionCreateCmd(global *GlobalFlags) *cobra.Command {
 	// so we don't MarkFlagsOneRequired — but supplying BOTH input modes is a
 	// user error and must be caught before any HTTP call lands.
 	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
-	return cmd
+	return wsScopedCmd(cmd)
 }
 
 func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
@@ -250,7 +260,7 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 				}
 				req.Labels = labelMap
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -280,7 +290,7 @@ func newConnectionUpdateCmd(global *GlobalFlags) *cobra.Command {
 	// URL), so we don't MarkFlagsOneRequired like create does — but supplying
 	// BOTH input modes is still a user error.
 	cmd.MarkFlagsMutuallyExclusive("password", "password-stdin")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newConnectionDeleteCmd(global *GlobalFlags) *cobra.Command {
@@ -293,7 +303,7 @@ func newConnectionDeleteCmd(global *GlobalFlags) *cobra.Command {
 			if !yes {
 				return fmt.Errorf("refusing to delete %q without --yes", args[0])
 			}
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -305,16 +315,16 @@ func newConnectionDeleteCmd(global *GlobalFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "confirm destructive delete")
-	return cmd
+	return wsGuardedCmd(cmd)
 }
 
 func newConnectionHealthCmd(global *GlobalFlags) *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "health ID",
 		Short: "Probe connection health",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newClient(cmd, global)
+			c, err := newConnClient(cmd, global, args[0])
 			if err != nil {
 				return err
 			}
@@ -329,6 +339,7 @@ func newConnectionHealthCmd(global *GlobalFlags) *cobra.Command {
 			return output.Print(cmd.OutOrStdout(), format, st)
 		},
 	}
+	return wsGuardedCmd(cmd)
 }
 
 // sanitizeHosts trims whitespace and drops empty entries. Returns an error if

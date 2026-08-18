@@ -39,13 +39,19 @@ forward any verb including write-capable ones such as set-config:.
 requires --yes/-y. Read-only runs (the default) need no confirmation.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// --allow-write makes cluster-manager skip its read-only verb
-			// whitelist entirely, so any set-config: reaches the live cluster.
-			// That is at least as destructive as the eleven pre-existing sites
-			// that gate on --yes, and the gate belongs on impact, not on the verb
-			// spelling. It is also the only guard on this path: cluster-manager
-			// hardens its read-only info route but leaves readOnly=false ungated
-			// server-side by design, and --allow-write drives exactly that route.
+			// --allow-write selects cluster-manager's write passthrough, so a
+			// set-config: can reach the live cluster. That is at least as
+			// destructive as the eleven pre-existing sites that gate on --yes,
+			// and the gate belongs on impact, not on the verb spelling.
+			//
+			// This was once the only guard on the path. It no longer is:
+			// aerospike-cluster-manager#467 put a dependency on that route which
+			// 403s unless the API runs with ACM_ALLOW_INFO_WRITE=true, and then
+			// still admits only info_verbs.WRITE_INFO_VERBS — never
+			// truncate-namespace. The client-side gate stays because the server
+			// one is opt-in: on an API where an operator has turned it on, --yes
+			// is again the last thing between a typo and a live cluster.
+			//
 			// --yes is the only affordance — there is no interactive prompt
 			// anywhere in ackoctl, by design, so CI can never hang here.
 			if allowWrite && !yes {

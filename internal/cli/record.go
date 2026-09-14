@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -135,7 +134,10 @@ func newRecordPutCmd(global *GlobalFlags) *cobra.Command {
 				return err
 			}
 			bins := map[string]any{}
-			if err := json.Unmarshal([]byte(binsJSON), &bins); err != nil {
+			// UseNumber-based decode: a plain json.Unmarshal would turn every
+			// bin value into a float64 and round int64 bins above 2^53 before
+			// the request is marshalled.
+			if err := decodeJSONNumber(binsJSON, &bins); err != nil {
 				return fmt.Errorf("--bins must be a JSON object: %w", err)
 			}
 			req := client.RecordWriteRequest{
@@ -310,7 +312,7 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 					return err
 				}
 				m := map[string]any{}
-				if err := json.Unmarshal([]byte(filterJSON), &m); err != nil {
+				if err := decodeJSONNumber(filterJSON, &m); err != nil {
 					return fmt.Errorf("--filter must be a JSON object: %w", err)
 				}
 				req.Filters = m
@@ -320,7 +322,7 @@ func newRecordQueryCmd(global *GlobalFlags) *cobra.Command {
 					return err
 				}
 				m := map[string]any{}
-				if err := json.Unmarshal([]byte(predicateJSON), &m); err != nil {
+				if err := decodeJSONNumber(predicateJSON, &m); err != nil {
 					return fmt.Errorf("--predicate must be a JSON object: %w", err)
 				}
 				req.Predicate = m

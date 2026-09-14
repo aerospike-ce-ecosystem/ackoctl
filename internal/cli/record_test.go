@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -356,4 +357,57 @@ func TestRecordQueryAcceptsEmptyFilter(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.True(t, called, "server should be called when --filter is omitted")
+}
+
+// TestRecordPutPreservesLargeIntegerBins guards the request half of the
+// UseNumber contract that internal/client/client.go already applies to
+// responses. Aerospike integer bins are int64, but a plain json.Unmarshal
+// into map[string]any routes every number through float64, so anything above
+// 2^53 (snowflake ids, nanosecond timestamps, 64-bit hashes) is silently
+// rounded before the body is marshalled — the server then writes the rounded
+// value and ackoctl exits 0. The raw body bytes are asserted directly; a
+// decoded map would lose the very precision under test.
+func TestRecordPutPreservesLargeIntegerBins(t *testing.T) {
+	var rawBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		rawBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"key":{"namespace":"test","set":"users","pk":"alice"},"bins":{"id":1}}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "put", "conn-1",
+		"--namespace", "test", "--set", "users", "--pk", "alice",
+		"--bins", `{"id":1234567890123456789,"ts":9007199254740993,"age":30}`,
+	)
+	require.NoError(t, err)
+	assert.Contains(t, rawBody, `"id":1234567890123456789`)
+	assert.Contains(t, rawBody, `"ts":9007199254740993`)
+	// Small integers must keep their compact form, not become 30.0 or 3e+01.
+	assert.Contains(t, rawBody, `"age":30`)
+}
+
+// TestRecordQueryPreservesLargeIntegersInFilterAndPredicate covers the other
+// two plain-Unmarshal sites on the request path: --filter and --predicate.
+func TestRecordQueryPreservesLargeIntegersInFilterAndPredicate(t *testing.T) {
+	var rawBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		rawBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"records":[],"total":0,"page":1,"pageSize":50,"hasMore":false,"executionTimeMs":1}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, _, err := runRecordCmd(t, srv.URL,
+		"record", "query", "conn-1",
+		"--namespace", "test",
+		"--filter", `{"id":1234567890123456789}`,
+		"--predicate", `{"ts":{"gte":9007199254740993}}`,
+	)
+	require.NoError(t, err)
+	assert.Contains(t, rawBody, `"id":1234567890123456789`)
+	assert.Contains(t, rawBody, `9007199254740993`)
 }

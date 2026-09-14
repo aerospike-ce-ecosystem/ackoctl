@@ -95,9 +95,11 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 					// numbers (the only meaningful between case for a secondary
 					// index range); strings/lists/other types are left to the
 					// server, which is the authority on their comparison semantics.
-					if lo, loOK := v.(float64); loOK {
-						if hi, hiOK := v2.(float64); hiOK && lo > hi {
-							return fmt.Errorf("--value (%v) must be <= --value2 (%v) for --op between; the bounds appear swapped", v, v2)
+					if lo, loOK := v.(json.Number); loOK {
+						if hi, hiOK := v2.(json.Number); hiOK {
+							if order, comparable := compareJSONNumbers(lo, hi); comparable && order > 0 {
+								return fmt.Errorf("--value (%v) must be <= --value2 (%v) for --op between; the bounds appear swapped", v, v2)
+							}
 						}
 					}
 					pred.Value2 = v2
@@ -139,12 +141,16 @@ correct particle type (number, string, list, etc.) reaches the server.`,
 // `[1,2]`, `{"k":1}`) or an unquoted bareword that we treat as a plain
 // string for UX (`--value alice`).
 //
+// Numbers are decoded with json.Decoder.UseNumber and therefore returned as
+// json.Number, so an int64 predicate value above 2^53 reaches the server with
+// its exact digits instead of a rounded float64.
+//
 // Only *structural* JSON openers (`{`, `[`, `"`) are required to parse as
 // valid JSON. For those, a parse failure is surfaced as an error instead of
 // silently downgrading to a string, so a typo like `--value '[1,2'` does not
 // end up as the literal string predicate `"[1,2"` on the server.
 //
-// Any other input is offered to json.Unmarshal opportunistically — so `30`
+// Any other input is offered to the JSON decoder opportunistically — so `30`
 // still becomes a number and `true`/`null` still parse — but on failure it
 // falls back to the raw string. This keeps numeric-looking barewords that are
 // valid Aerospike string values but invalid JSON (leading zeros like `007`,
@@ -154,13 +160,13 @@ func parseJSONScalar(s string) (any, error) {
 	trimmed := strings.TrimSpace(s)
 	if looksLikeStructuredJSON(trimmed) {
 		var v any
-		if err := json.Unmarshal([]byte(trimmed), &v); err != nil {
+		if err := decodeJSONNumber(trimmed, &v); err != nil {
 			return nil, fmt.Errorf("looks like JSON but did not parse: %w", err)
 		}
 		return v, nil
 	}
 	var v any
-	if err := json.Unmarshal([]byte(trimmed), &v); err == nil {
+	if err := decodeJSONNumber(trimmed, &v); err == nil {
 		return v, nil
 	}
 	return s, nil

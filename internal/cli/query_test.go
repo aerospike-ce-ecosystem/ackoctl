@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,13 +22,14 @@ func TestParseJSONScalarBareword(t *testing.T) {
 func TestParseJSONScalarNumber(t *testing.T) {
 	v, err := parseJSONScalar("30")
 	require.NoError(t, err)
-	assert.Equal(t, float64(30), v)
+	// UseNumber keeps the exact digits; small ints still marshal back as `30`.
+	assert.Equal(t, json.Number("30"), v)
 }
 
 func TestParseJSONScalarList(t *testing.T) {
 	v, err := parseJSONScalar(`[1,2,3]`)
 	require.NoError(t, err)
-	assert.Equal(t, []any{float64(1), float64(2), float64(3)}, v)
+	assert.Equal(t, []any{json.Number("1"), json.Number("2"), json.Number("3")}, v)
 }
 
 func TestParseJSONScalarQuotedString(t *testing.T) {
@@ -62,7 +64,7 @@ func TestParseJSONScalarBoolLiteral(t *testing.T) {
 func TestParseJSONScalarNegativeNumber(t *testing.T) {
 	v, err := parseJSONScalar("-3.14")
 	require.NoError(t, err)
-	assert.Equal(t, -3.14, v)
+	assert.Equal(t, json.Number("-3.14"), v)
 }
 
 // Numeric-looking barewords that are valid Aerospike string values but invalid
@@ -282,4 +284,57 @@ func TestQueryExecRejectsUnknownOp(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "equals|between|contains|geo_within_region|geo_contains_point")
+}
+
+// TestQueryExecPreservesLargeIntegerValues is the query-side half of the
+// record put precision guard: --value / --value2 went through a plain
+// json.Unmarshal into any, so an int64 key above 2^53 was rounded and the
+// query silently matched nothing. Assert the raw bytes, since decoding the
+// body would discard the precision under test.
+func TestQueryExecPreservesLargeIntegerValues(t *testing.T) {
+	var rawBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		rawBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"records":[],"executionTimeMs":1,"scannedRecords":0,"returnedRecords":0}`))
+	}))
+	t.Cleanup(srv.Close)
+	_, err := runQueryCmd(t, srv.URL,
+		"query", "exec", "conn-1",
+		"--namespace", "test", "--bin", "id", "--op", "between",
+		"--value", "1234567890123456789", "--value2", "1234567890123456799",
+	)
+	require.NoError(t, err)
+	assert.Contains(t, rawBody, `"value":1234567890123456789`)
+	assert.Contains(t, rawBody, `"value2":1234567890123456799`)
+}
+
+// TestQueryExecBetweenRejectsInvertedBoundsAcrossNumericForms keeps the
+// swapped-bounds guard working once the operands are json.Number rather than
+// float64: an exponent-form lower bound and an integer upper bound are still
+// numerically comparable, and huge int64 bounds must compare exactly rather
+// than collapsing onto the same float64.
+func TestQueryExecBetweenRejectsInvertedBoundsAcrossNumericForms(t *testing.T) {
+	cases := []struct{ name, value, value2 string }{
+		{"exponent-lo", "1e3", "5"},
+		{"float-lo", "10.5", "10.1"},
+		{"int64-beyond-float64-precision", "1234567890123456789", "1234567890123456788"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				t.Fatal("server should not be hit when --op between bounds are inverted")
+			}))
+			t.Cleanup(srv.Close)
+			_, err := runQueryCmd(t, srv.URL,
+				"query", "exec", "conn-1",
+				"--namespace", "test", "--bin", "n", "--op", "between",
+				"--value", tc.value, "--value2", tc.value2,
+			)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "must be <= --value2")
+		})
+	}
 }
